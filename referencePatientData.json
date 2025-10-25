@@ -1,0 +1,128 @@
+{
+  "patient_info": {
+    "name": "Healthy Guy",
+    "age": 30,
+    "pills": [
+        {
+          "name": "Ibuprofen",
+          "frequency": {
+            "Monday": true,
+            "Tuesday": true,
+            "Wednesday": true,
+            "Thursday": true,
+            "Friday": true,
+            "Saturday": true,
+            "Sunday": true
+          },
+          "box_index": 1
+        },
+        {
+          "name": "Vitamin D",
+          "frequency": {
+            "Monday": true,
+            "Tuesday": false,
+            "Wednesday": false,
+            "Thursday": false,
+            "Friday": true,
+            "Saturday": false,
+            "Sunday": false
+          },
+          "box_index": 2
+        },
+        {
+          "name": "Lisinopril",
+          "frequency": {
+            "Monday": true,
+            "Tuesday": true,
+            "Wednesday": true,
+            "Thursday": true,
+            "Friday": true,
+            "Saturday": true,
+            "Sunday": true
+          },
+          "box_index": 3
+        },
+        {
+          "name": "Metformin",
+          "frequency": {
+            "Monday": true,
+            "Tuesday": true,
+            "Wednesday": true,
+            "Thursday": true,
+            "Friday": true,
+            "Saturday": false,
+            "Sunday": false
+          },
+          "box_index": 4
+        },
+        {
+          "name": "Cetirizine",
+          "frequency": {
+            "Monday": false,
+            "Tuesday": false,
+            "Wednesday": false,
+            "Thursday": false,
+            "Friday": false,
+            "Saturday": true,
+            "Sunday": true
+          },
+          "box_index": 5
+        },
+        {
+          "name": "Aspirin",
+          "frequency": {
+            "Monday": true,
+            "Tuesday": false,
+            "Wednesday": true,
+            "Thursday": false,
+            "Friday": true,
+            "Saturday": false,
+            "Sunday": false
+          },
+          "box_index": 6
+        }
+      ]
+    },
+  "transcriptions": [
+    {
+      "timestamp": 1761340800,
+      "transcription": "I am really tired today, my stomach hurts, my head hurts, and I feel sore on my neck."
+    },
+    {
+      "timestamp": 1761427200,
+      "transcription": "Woke up feeling a bit better, but my appetite is still low and I felt dizzy when I stood up quickly."
+    },
+    {
+      "timestamp": 1761513600,
+      "transcription": "Slept through the night, but woke up with a mild headache and stiffness in my shoulders."
+    },
+    {
+      "timestamp": 1761600000,
+      "transcription": "Had some chest tightness earlier, but it eased after I rested. Energy level is still low."
+    },
+    {
+      "timestamp": 1761686400,
+      "transcription": "Felt anxious this morning, maybe because I didn’t sleep much. My hands were shaking slightly."
+    },
+    {
+      "timestamp": 1761772800,
+      "transcription": "Pain in my lower back has been constant today. Took some medication and it helped for a few hours."
+    },
+    {
+      "timestamp": 1761859200,
+      "transcription": "Feeling more alert today. The headache is gone, but I still have some neck soreness."
+    },
+    {
+      "timestamp": 1761945600,
+      "transcription": "My throat feels scratchy and I’m starting to cough a bit. Hoping it’s not a cold coming on."
+    },
+    {
+      "timestamp": 1762032000,
+      "transcription": "Cough is worse and my voice sounds hoarse. Slight fever this evening."
+    },
+    {
+      "timestamp": 1762118400,
+      "transcription": "Fever went down today. Still coughing but breathing feels normal again. Appetite returning slowly."
+    }
+  ]
+}
