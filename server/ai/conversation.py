@@ -20,12 +20,10 @@ class ConversationManager:
 
     async def start_session(
         self,
-        user_id: str,
         medication_id: Optional[UUID] = None
     ) -> ConversationSession:
         """Start a new conversation session"""
         session = ConversationSession(
-            user_id=user_id,
             medication_id=medication_id
         )
 
@@ -39,7 +37,7 @@ class ConversationManager:
         # Store in active sessions
         self.active_sessions[session.session_id] = session
         
-        logger.info(f"Started conversation session {session.session_id} for user {user_id}")
+        logger.info(f"Started conversation session {session.session_id}")
         
         return session
 

@@ -3,7 +3,7 @@ Configuration Management using Pydantic Settings
 """
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import List, Union
+from typing import List, Union, Optional
 import json
 
 
@@ -29,13 +29,14 @@ class Settings(BaseSettings):
     cors_origins: Union[List[str], str] = '["http://localhost:3000", "http://localhost:5173"]'
     
     # AI/LLM Settings
-    ai_provider: str = "mock"  # "openai", "anthropic", "ollama", "mock"
-    openai_api_key: str = ""
-    anthropic_api_key: str = ""
+    ai_provider: str = "gemini"  # "openai", "anthropic", "ollama", "gemini", "mock"
+    openai_api_key: Optional[str] = None
+    anthropic_api_key: Optional[str] = None
+    gemini_api_key: Optional[str] = None
     ollama_base_url: str = "http://localhost:11434"
     
     # LLM Model Settings
-    llm_model: str = "gpt-4-turbo-preview"  # or "claude-3-opus-20240229"
+    llm_model: str = "gemini-2.5-flash"  # or "claude-3-opus-20240229"
     llm_temperature: float = 0.7
     llm_max_tokens: int = 500
     
@@ -81,7 +82,7 @@ settings = Settings()
 # Validate settings on import
 def validate_settings():
     """Validate critical settings"""
-    if settings.ai_provider not in ["mock", "openai", "anthropic", "ollama"]:
+    if settings.ai_provider not in ["mock", "openai", "anthropic", "ollama", "gemini"]:
         raise ValueError(f"Invalid AI provider: {settings.ai_provider}")
     
     if settings.hardware_mode not in ["mock", "production"]:

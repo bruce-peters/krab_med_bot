@@ -11,5 +11,70 @@
     "error_message": "'MockHardwareInterface' object has no attribute 'highlight_compartment'",
     "conversation_session_id": null,
     "ai_greeting": null
+  },
+  {
+    "event_id": "20a5ab6a-679e-4013-b4df-5e0f036e72b7",
+    "timestamp": "2025-10-25 19:57:39.722069",
+    "compartment": 1,
+    "medication_id": "550e8400-e29b-41d4-a716-446655440000",
+    "status": "success",
+    "box_opened": true,
+    "led_activated": true,
+    "servo_response": "{'status': 'success', 'position': 'open', 'compartment': 1, 'mock': True}",
+    "error_message": null,
+    "conversation_session_id": "f716867e-c8e1-465d-8d5c-3cee5d76e55f",
+    "ai_greeting": "Thank you for sharing that with me. How are you feeling today? Are you experiencing any discomfort?"
+  },
+  {
+    "event_id": "6241d5b0-1764-4545-bd92-069399fc60e9",
+    "timestamp": "2025-10-25 20:22:48.767191",
+    "compartment": 1,
+    "medication_id": "550e8400-e29b-41d4-a716-446655440000",
+    "status": "success",
+    "box_opened": true,
+    "led_activated": true,
+    "servo_response": "{'status': 'success', 'position': 'open', 'compartment': 1, 'mock': True}",
+    "error_message": null,
+    "conversation_session_id": "c5ad1dc3-daf1-47c6-8c5e-2b79b3f9105f",
+    "ai_greeting": "Thank you for sharing that with me. How are you feeling today? Are you experiencing any discomfort?"
+  },
+  {
+    "event_id": "3628ffff-d20b-47ca-9305-8df2b71c7588",
+    "timestamp": "2025-10-25 20:25:40.328408",
+    "compartment": 1,
+    "medication_id": "550e8400-e29b-41d4-a716-446655440000",
+    "status": "success",
+    "box_opened": true,
+    "led_activated": true,
+    "servo_response": "{'status': 'success', 'position': 'open', 'compartment': 1, 'mock': True}",
+    "error_message": null,
+    "conversation_session_id": "53eb1430-7888-4e39-9b23-d6f69f094b92",
+    "ai_greeting": "I apologize, I'm having trouble responding right now. How can I help you?"
+  },
+  {
+    "event_id": "dd4a3ba6-d3e5-4949-b853-b6409401aabd",
+    "timestamp": "2025-10-25 20:31:29.664029",
+    "compartment": 1,
+    "medication_id": "550e8400-e29b-41d4-a716-446655440000",
+    "status": "success",
+    "box_opened": true,
+    "led_activated": true,
+    "servo_response": "{'status': 'success', 'position': 'open', 'compartment': 1, 'mock': True}",
+    "error_message": null,
+    "conversation_session_id": "0c79141f-f484-496d-a81b-b98b4b56ed1e",
+    "ai_greeting": "I apologize, I'm having trouble responding right now. How can I help you?"
+  },
+  {
+    "event_id": "471e7fdb-e642-4db0-a9bb-27626f0f0e79",
+    "timestamp": "2025-10-25 20:32:24.120544",
+    "compartment": 1,
+    "medication_id": "550e8400-e29b-41d4-a716-446655440000",
+    "status": "success",
+    "box_opened": true,
+    "led_activated": true,
+    "servo_response": "{'status': 'success', 'position': 'open', 'compartment': 1, 'mock': True}",
+    "error_message": null,
+    "conversation_session_id": "5d7ada33-82e0-46e2-8289-38b35fe616e8",
+    "ai_greeting": "I apologize, I'm having trouble responding right now. How can I help you?"
   }
 ]

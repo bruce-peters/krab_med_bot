@@ -19,6 +19,10 @@ class LLMClient:
             self.tokenizer = tiktoken.encoding_for_model(self.model)
         elif self.provider == "anthropic":
             self.client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+        elif self.provider == "gemini":
+            import google.generativeai as genai
+            genai.configure(api_key=settings.gemini_api_key)
+            self.client = genai.GenerativeModel(self.model)
         elif self.provider == "ollama":
             self.base_url = settings.ollama_base_url
             self.http_client = httpx.AsyncClient(timeout=30.0)
@@ -42,6 +46,8 @@ class LLMClient:
                 return await self._generate_openai(messages, temperature, max_tokens)
             elif self.provider == "anthropic":
                 return await self._generate_anthropic(messages, temperature, max_tokens)
+            elif self.provider == "gemini":
+                return await self._generate_gemini(messages, temperature, max_tokens)
             elif self.provider == "ollama":
                 return await self._generate_ollama(messages, temperature, max_tokens)
             elif self.provider == "mock":
@@ -84,6 +90,44 @@ class LLMClient:
             max_tokens=max_tokens
         )
         return response.content[0].text
+
+    async def _generate_gemini(
+        self,
+        messages: List[Dict[str, str]],
+        temperature: float,
+        max_tokens: int
+    ) -> str:
+        """Generate response using Google Gemini API"""
+        # Convert messages to Gemini format
+        chat_history = []
+        prompt = ""
+        
+        for msg in messages:
+            if msg["role"] == "system":
+                # Gemini doesn't have system role, prepend to first user message
+                prompt = msg["content"] + "\n\n"
+            elif msg["role"] == "user":
+                chat_history.append({"role": "user", "parts": [msg["content"]]})
+            elif msg["role"] == "assistant":
+                chat_history.append({"role": "model", "parts": [msg["content"]]})
+        
+        # Get the last user message as prompt
+        if chat_history and chat_history[-1]["role"] == "user":
+            prompt += chat_history[-1]["parts"][0]
+            chat_history = chat_history[:-1]
+        
+        # Start chat with history
+        chat = self.client.start_chat(history=chat_history)
+        
+        # Generate response
+        response = await chat.send_message_async(
+            prompt,
+            generation_config={
+                "temperature": temperature,
+                "max_output_tokens": max_tokens,
+            }
+        )
+        return response.text
 
     async def _generate_ollama(
         self,
@@ -143,6 +187,9 @@ class LLMClient:
             elif self.provider == "anthropic":
                 async for chunk in await self._stream_anthropic(messages, temperature, max_tokens):
                     yield chunk
+            elif self.provider == "gemini":
+                async for chunk in await self._stream_gemini(messages, temperature, max_tokens):
+                    yield chunk
             elif self.provider == "ollama":
                 async for chunk in await self._stream_ollama(messages, temperature, max_tokens):
                     yield chunk
@@ -193,6 +240,44 @@ class LLMClient:
             async for text in stream.text_stream:
                 yield text
 
+    async def _stream_gemini(
+        self,
+        messages: List[Dict[str, str]],
+        temperature: float,
+        max_tokens: int
+    ) -> AsyncIterator[str]:
+        """Stream response from Google Gemini"""
+        # Convert messages to Gemini format
+        chat_history = []
+        prompt = ""
+        
+        for msg in messages:
+            if msg["role"] == "system":
+                prompt = msg["content"] + "\n\n"
+            elif msg["role"] == "user":
+                chat_history.append({"role": "user", "parts": [msg["content"]]})
+            elif msg["role"] == "assistant":
+                chat_history.append({"role": "model", "parts": [msg["content"]]})
+        
+        if chat_history and chat_history[-1]["role"] == "user":
+            prompt += chat_history[-1]["parts"][0]
+            chat_history = chat_history[:-1]
+        
+        chat = self.client.start_chat(history=chat_history)
+        
+        response = await chat.send_message_async(
+            prompt,
+            generation_config={
+                "temperature": temperature,
+                "max_output_tokens": max_tokens,
+            },
+            stream=True
+        )
+        
+        async for chunk in response:
+            if chunk.text:
+                yield chunk.text
+
     async def _stream_ollama(
         self,
         messages: List[Dict[str, str]],
@@ -225,7 +310,7 @@ class LLMClient:
         try:
             if self.provider == "openai":
                 return len(self.tokenizer.encode(text))
-            elif self.provider == "anthropic":
+            elif self.provider == "anthropic" or self.provider == "gemini":
                 # Approximation: ~4 chars per token
                 return len(text) // 4
             elif self.provider == "ollama":
@@ -239,7 +324,7 @@ class LLMClient:
 
     async def estimate_cost(self, messages: List[Dict[str, str]], response_tokens: int = 500) -> float:
         """Estimate API cost for request"""
-        if self.provider not in ["openai", "anthropic"]:
+        if self.provider not in ["openai", "anthropic", "gemini"]:
             return 0.0  # Free for local models
         
         total_tokens = sum(await self.count_tokens(m["content"]) for m in messages)
@@ -259,6 +344,14 @@ class LLMClient:
             else:  # Sonnet
                 input_cost = total_tokens * 0.000003  # $3 per 1M tokens
                 output_cost = response_tokens * 0.000015  # $15 per 1M tokens
+        elif self.provider == "gemini":
+            # Gemini 1.5 Flash pricing
+            if "flash" in self.model.lower():
+                input_cost = total_tokens * 0.00000035  # $0.35 per 1M tokens
+                output_cost = response_tokens * 0.00000105  # $1.05 per 1M tokens
+            else:  # Gemini 1.5 Pro
+                input_cost = total_tokens * 0.0000035  # $3.50 per 1M tokens
+                output_cost = response_tokens * 0.0000105  # $10.50 per 1M tokens
         
         return input_cost + output_cost
 

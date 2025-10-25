@@ -197,10 +197,11 @@ async def shutdown_event():
 
 3. **AI/LLM Settings**
 
-   - `ai_provider`: "openai", "anthropic", or "ollama"
+   - `ai_provider`: "openai", "anthropic", "gemini", or "ollama"
    - `openai_api_key`: OpenAI API key
    - `anthropic_api_key`: Anthropic API key
-   - `llm_model`: Model name (e.g., "gpt-4-turbo-preview")
+   - `gemini_api_key`: Google Gemini API key
+   - `llm_model`: Model name (e.g., "gpt-4-turbo-preview", "gemini-1.5-flash")
    - `llm_temperature`: Response randomness (0-1)
    - `llm_max_tokens`: Maximum response length
 
@@ -315,9 +316,11 @@ HARDWARE_MODE=mock
 SERVO_CONTROLLER_URL=http://localhost:8080
 
 # AI
-AI_PROVIDER=openai
+AI_PROVIDER=gemini
 OPENAI_API_KEY=sk-your-key-here
-LLM_MODEL=gpt-4-turbo-preview
+ANTHROPIC_API_KEY=sk-ant-your-key-here
+GEMINI_API_KEY=your-gemini-api-key-here
+LLM_MODEL=gemini-1.5-flash
 LLM_TEMPERATURE=0.7
 LLM_MAX_TOKENS=500
 

@@ -5,6 +5,8 @@ from typing import Any, List, Dict, Optional
 from datetime import datetime
 import logging
 
+from server.models.schemas import HealthDataEntry, DispensingEvent
+
 logger = logging.getLogger(__name__)
 
 async def load_json_file(filepath: str, default: Any = None) -> Any:
@@ -197,3 +199,43 @@ def save_json_file_sync(filepath: str, data: Any, indent: int = 2) -> bool:
     except Exception as e:
         logger.error(f"Error saving JSON file {filepath}: {e}")
         return False
+
+async def save_health_data(entry: HealthDataEntry) -> None:
+    """Save health data entry to JSON file"""
+    filepath = Path(settings.data_dir) / "health_logs.json"
+    
+    async with aiofiles.open(filepath, mode='r') as f:
+        content = await f.read()
+        data = json.loads(content) if content else []
+    
+    # Convert to dict and add to list
+    data.append(entry.dict())
+    
+    async with aiofiles.open(filepath, mode='w') as f:
+        await f.write(json.dumps(data, indent=2, default=str))
+
+async def load_health_data() -> List[HealthDataEntry]:
+    """Load all health data entries"""
+    filepath = Path(settings.data_dir) / "health_logs.json"
+    
+    if not filepath.exists():
+        return []
+    
+    async with aiofiles.open(filepath, mode='r') as f:
+        content = await f.read()
+        data = json.loads(content) if content else []
+    
+    return [HealthDataEntry(**entry) for entry in data]
+
+async def save_dispensing_event(event: DispensingEvent) -> None:
+    """Save dispensing event to JSON file"""
+    filepath = Path(settings.data_dir) / "dispensing_events.json"
+    
+    async with aiofiles.open(filepath, mode='r') as f:
+        content = await f.read()
+        data = json.loads(content) if content else []
+    
+    data.append(event.dict())
+    
+    async with aiofiles.open(filepath, mode='w') as f:
+        await f.write(json.dumps(data, indent=2, default=str))

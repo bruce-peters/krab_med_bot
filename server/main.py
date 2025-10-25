@@ -98,8 +98,8 @@ app.add_middleware(
 app.include_router(hardware.router)
 app.include_router(medication.router)
 app.include_router(health_data.router)
-app.include_router(ai_conversation.router)
-app.include_router(voice.router)
+app.include_router(ai_conversation.router)  # NEW
+app.include_router(voice.router)            # NEW
 
 
 # Root endpoint

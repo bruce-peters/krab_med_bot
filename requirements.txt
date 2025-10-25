@@ -17,6 +17,7 @@ dotenv
 openai==1.10.0              # OpenAI API client
 anthropic==0.18.0           # Claude API client (optional)
 tiktoken==0.5.2             # Token counting for OpenAI
+google-generativeai>=0.3.0
 
 # spaCy requires compatible version - OPTIONAL (comment out for now)
 # spacy>=3.7.2                # NLP for symptom extraction (has pydantic v1 conflict)
