@@ -124,7 +124,6 @@ class LLMClient:
             prompt,
             generation_config={
                 "temperature": temperature,
-                "max_output_tokens": max_tokens,
             }
         )
         return response.text

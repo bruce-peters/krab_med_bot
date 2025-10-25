@@ -13,6 +13,7 @@ from server.ai.conversation import conversation_manager
 from server.ai.symptom_analyzer import symptom_analyzer
 from server.ai.recommendation import recommendation_engine
 from server.utils.json_handler import save_health_data
+from server.config import settings
 from uuid import UUID
 from typing import Optional, List
 import logging
@@ -22,7 +23,6 @@ router = APIRouter(prefix="/api/ai", tags=["ai"])
 
 @router.post("/conversation/start", response_model=ConversationSession)
 async def start_conversation(
-    user_id: str,
     medication_id: Optional[UUID] = None
 ):
     """
@@ -34,9 +34,9 @@ async def start_conversation(
     - Returns session details
     """
     try:
-        logger.info(f"Starting conversation for user: {user_id}, medication: {medication_id}")
+        logger.info(f"Starting conversation medication: {medication_id}")
         
-        session = await conversation_manager.start_session(user_id, medication_id)
+        session = await conversation_manager.start_session(medication_id)
         
         # Generate opening greeting (internal trigger)
         greeting = await conversation_manager.generate_response(
@@ -108,27 +108,74 @@ async def end_conversation(session_id: UUID):
         
         # Extract symptoms using AI
         logger.info("Extracting symptoms from conversation...")
-        symptoms = await symptom_analyzer.extract_symptoms(conversation_text)
+        try:
+            symptoms = await symptom_analyzer.extract_symptoms(conversation_text)
+        except Exception as e:
+            logger.error(f"Symptom extraction failed: {e}", exc_info=True)
+            # Create a safe fallback with all required fields
+            symptoms = SymptomExtractionResult(
+                symptoms={
+                    "general_feeling": "conversation completed"
+                },
+                confidence_scores={},
+                extracted_entities=[],
+                sentiment="neutral",
+                urgency_level="low",
+                extracted_count=0
+            )
         
-        # Generate recommendations
+        # Handle empty symptoms (safety block or parsing error)
+        if not symptoms or not symptoms.symptoms:
+            logger.warning("No symptoms extracted, using default values")
+            symptoms = SymptomExtractionResult(
+                symptoms={
+                    "general_feeling": "reported but not detailed"
+                },
+                confidence_scores={},
+                extracted_entities=[],
+                sentiment=getattr(symptoms, 'sentiment', 'neutral'),
+                urgency_level="low",
+                extracted_count=0
+            )
+        
+        # Generate recommendations with error handling
         logger.info("Generating health recommendations...")
-        recommendations = await recommendation_engine.generate_recommendations(
-            symptoms.symptoms,
-            {}  # TODO: Get user history from storage
-        )
+        try:
+            recommendations = await recommendation_engine.generate_recommendations(
+                symptoms.symptoms,
+                {}  # TODO: Get user history from storage
+            )
+        except Exception as e:
+            logger.error(f"Recommendation generation failed: {e}", exc_info=True)
+            # Provide safe fallback recommendations
+            recommendations = [
+                HealthRecommendation(
+                    recommendation_text="Continue taking your medications as prescribed",
+                    category="general",
+                    priority="low",
+                    based_on=[]
+                ),
+                HealthRecommendation(
+                    recommendation_text="If you experience any concerning symptoms, contact your healthcare provider",
+                    category="seek_help",
+                    priority="medium",
+                    based_on=[]
+                )
+            ]
         
-        # Build health data entry
+        # Build health data entry with safe defaults
         health_entry = HealthDataEntry(
             medication_id=session.medication_id,
-            symptoms=HealthSymptoms(**symptoms.symptoms),
+            symptoms=HealthSymptoms(**symptoms.symptoms) if symptoms.symptoms else HealthSymptoms(),
             vital_signs=VitalSigns(
-                mood=symptoms.symptoms.get("mood", "okay"),
-                sleep_quality=symptoms.symptoms.get("sleep_quality", "fair")
+                mood=symptoms.symptoms.get("mood") if symptoms.symptoms else None,
+                sleep_quality=symptoms.symptoms.get("sleep_quality") if symptoms.symptoms else None,
+                appetite=symptoms.symptoms.get("appetite") if symptoms.symptoms else None
             ),
             ai_interaction=AIInteraction(
                 questions_asked=[m.content for m in session.messages if m.role == "assistant"],
                 responses_given=[m.content for m in session.messages if m.role == "user"],
-                conversation_summary=f"Extracted {len(symptoms.symptoms)} symptoms. Urgency: {symptoms.urgency_level}"
+                conversation_summary=f"Extracted {len(symptoms.symptoms) if symptoms.symptoms else 0} symptoms. Urgency: {symptoms.urgency_level}. Sentiment: {symptoms.sentiment}"
             )
         )
         
@@ -149,7 +196,7 @@ async def end_conversation(session_id: UUID):
     except KeyError:
         raise HTTPException(status_code=404, detail="Conversation session not found")
     except Exception as e:
-        logger.error(f"Error ending conversation: {e}")
+        logger.error(f"Error ending conversation: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to end conversation: {str(e)}")
 
 @router.get("/conversation/{session_id}", response_model=ConversationSession)

@@ -36,9 +36,9 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     
     # LLM Model Settings
-    llm_model: str = "gemini-2.5-flash"  # or "claude-3-opus-20240229"
+    llm_model: str = "gemini-2.5-flash"  # Latest model with better safety handling
     llm_temperature: float = 0.7
-    llm_max_tokens: int = 500
+    llm_max_tokens: int = 100000
     
     # Speech Settings
     stt_provider: str = "mock"  # "openai", "whisper_local", "mock"

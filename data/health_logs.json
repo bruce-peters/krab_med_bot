@@ -21,5 +21,105 @@
       "energy_level": null
     },
     "ai_interaction": null
+  },
+  {
+    "entry_id": "64b982ca-5e39-44a5-a84f-f0e04c1ce2ba",
+    "timestamp": "2025-10-25 21:14:28.427504",
+    "user_id": "default_user",
+    "medication_id": "550e8400-e29b-41d4-a716-446655440000",
+    "symptoms": {
+      "pain_level": null,
+      "nausea": false,
+      "dizziness": false,
+      "fatigue": false,
+      "headache": false,
+      "shortness_of_breath": false,
+      "custom_notes": null,
+      "other_symptoms": []
+    },
+    "vital_signs": {
+      "mood": null,
+      "sleep_quality": null,
+      "appetite": null,
+      "energy_level": null
+    },
+    "ai_interaction": {
+      "questions_asked": [
+        "Hello there! It's lovely to hear from you. How are you feeling right now, as you're getting ready to take your medicine?"
+      ],
+      "responses_given": [
+        "User has opened the medication box and is ready to talk."
+      ],
+      "conversation_summary": "Extracted 1 symptoms. Urgency: low. Sentiment: neutral",
+      "sentiment_analysis": null
+    }
+  },
+  {
+    "entry_id": "e116f575-504a-461b-876d-25050dd08602",
+    "timestamp": "2025-10-25 21:27:55.004379",
+    "user_id": "default_user",
+    "medication_id": "550e8400-e29b-41d4-a716-446655440000",
+    "symptoms": {
+      "pain_level": null,
+      "nausea": false,
+      "dizziness": false,
+      "fatigue": false,
+      "headache": false,
+      "shortness_of_breath": false,
+      "custom_notes": null,
+      "other_symptoms": []
+    },
+    "vital_signs": {
+      "mood": "not_mentioned",
+      "sleep_quality": "not_mentioned",
+      "appetite": "not_mentioned",
+      "energy_level": null
+    },
+    "ai_interaction": {
+      "questions_asked": [
+        "Hello there! It's good to connect with you. How are you feeling right now, as you're taking your medication?"
+      ],
+      "responses_given": [
+        "User has opened the medication box and is ready to talk."
+      ],
+      "conversation_summary": "Extracted 9 symptoms. Urgency: low. Sentiment: positive",
+      "sentiment_analysis": null
+    }
+  },
+  {
+    "entry_id": "6b53e769-17d0-46e3-b2cf-80f06ebabd95",
+    "timestamp": "2025-10-25 21:29:47.411324",
+    "user_id": "default_user",
+    "medication_id": "550e8400-e29b-41d4-a716-446655440000",
+    "symptoms": {
+      "pain_level": 10,
+      "nausea": false,
+      "dizziness": false,
+      "fatigue": false,
+      "headache": false,
+      "shortness_of_breath": false,
+      "custom_notes": null,
+      "other_symptoms": []
+    },
+    "vital_signs": {
+      "mood": "poor",
+      "sleep_quality": "not_mentioned",
+      "appetite": "not_mentioned",
+      "energy_level": null
+    },
+    "ai_interaction": {
+      "questions_asked": [
+        "Hello there! It's good to connect with you.\n\nHow are you feeling right now, as you're taking your medicines? Please take your time.",
+        "Oh dear, I'm so sorry to hear that. I understand you're feeling really bad right now.\n\nCan you tell me a little more about what's making you feel bad? Are you feeling any pain, or perhaps a bit dizzy or nauseous?",
+        "Oh dear, that sounds incredibly painful. I'm so sorry you're feeling such sharp pain in your leg.\n\nThis kind of pain needs attention right away. Please call your doctor's office immediately, or have someone help you make the call. They will be able to help you."
+      ],
+      "responses_given": [
+        "User has opened the medication box and is ready to talk.",
+        "I am feeling really bad",
+        "PAIN LEVEL 100000 I AM FEELING A SHARP PAIN IN MY LEG WHAT DO I DO?????"
+      ],
+      "conversation_summary": "Extracted 10 symptoms. Urgency: urgent. Sentiment: negative",
+      "sentiment_analysis": null
+    }
   }
 ]

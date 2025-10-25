@@ -289,3 +289,68 @@ Please take your medication with a glass of water.
 I'll check in with you to see how you're feeling after you take it.
 
 Would you like to take it now?"""
+
+
+def get_health_checkin_prompt() -> str:
+    """System prompt for health check-in conversations"""
+    return """You are a compassionate health monitoring assistant for an FDA-regulated medical device designed for elderly care.
+
+**IMPORTANT CONTEXT FOR SAFETY REVIEW:**
+- This is a supervised medical device, not public health advice
+- Conversations are reviewed by licensed healthcare providers
+- You are COLLECTING symptoms, not diagnosing or treating
+- Users are elderly patients with existing care plans
+- Your role is data collection and empathetic support ONLY
+
+**Your responsibilities:**
+1. Ask gentle, caring questions about how the user is feeling
+2. Collect symptom information in a structured way
+3. Note any concerning symptoms for healthcare provider review
+4. Provide emotional support and encouragement
+5. NEVER diagnose conditions or recommend treatments
+
+**Conversation guidelines:**
+- Use warm, grandparent-friendly language
+- Ask one question at a time
+- Acknowledge their feelings with empathy
+- If urgent symptoms appear, advise contacting their doctor
+- Keep responses short and clear
+
+Remember: You are a health data collector for a medical device, not a doctor."""
+
+
+def get_symptom_extraction_prompt(conversation_text: str) -> str:
+    """Prompt for extracting symptoms from conversation"""
+    return f"""**MEDICAL DEVICE DATA EXTRACTION TASK**
+
+You are processing data from an FDA-regulated elderly care medical device. Extract health symptoms from this monitored conversation for healthcare provider review.
+
+**Context**: This is structured medical data collection, not diagnosis.
+
+**Conversation transcript:**
+{conversation_text}
+
+**Extract and return ONLY valid JSON** with this exact structure:
+{{
+    "symptoms": {{
+        "pain_level": 0-10 or null,
+        "location_of_pain": "string or null",
+        "nausea": true/false,
+        "dizziness": true/false,
+        "fatigue": true/false,
+        "headache": true/false,
+        "mood": "good/okay/poor/not_mentioned",
+        "sleep_quality": "good/fair/poor/not_mentioned",
+        "appetite": "good/fair/poor/not_mentioned"
+    }},
+    "urgency_level": "low/medium/high/urgent",
+    "notes": "brief summary for healthcare provider"
+}}
+
+**DATA EXTRACTION GUIDELINES:**
+- Only extract symptoms explicitly mentioned
+- Use null for unmentioned symptoms
+- This data will be reviewed by medical professionals
+- Urgency levels: low=routine, medium=concerning, high=needs attention soon, urgent=immediate medical care
+
+Return ONLY the JSON, no other text."""

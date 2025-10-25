@@ -83,10 +83,10 @@ class HealthSymptoms(BaseModel):
 
 class VitalSigns(BaseModel):
     """Vital signs and general health indicators"""
-    mood: Optional[str] = Field(None, pattern="^(good|okay|bad)$")
-    sleep_quality: Optional[str] = Field(None, pattern="^(good|fair|poor)$")
-    appetite: Optional[str] = Field(None, pattern="^(good|fair|poor)$")
-    energy_level: Optional[str] = Field(None, pattern="^(high|medium|low)$")
+    mood: Optional[str] = None  # Removed strict pattern
+    sleep_quality: Optional[str] = None  # Removed strict pattern
+    appetite: Optional[str] = None  # Removed strict pattern
+    energy_level: Optional[str] = None  # Removed strict pattern
     
     model_config = ConfigDict(
         json_schema_extra={
@@ -245,7 +245,6 @@ class ConversationMessage(BaseModel):
 class ConversationSession(BaseModel):
     """AI conversation session"""
     session_id: UUID = Field(default_factory=uuid4)
-    user_id: str
     medication_id: Optional[UUID] = None
     started_at: datetime = Field(default_factory=datetime.utcnow)
     ended_at: Optional[datetime] = None
@@ -256,7 +255,6 @@ class ConversationSession(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "user_id": "user_001",
                 "medication_id": "550e8400-e29b-41d4-a716-446655440000",
                 "messages": [
                     {
@@ -347,15 +345,14 @@ class VoiceInteractionResponse(BaseModel):
 # ========== SYMPTOM ANALYSIS MODELS ==========
 
 class SymptomExtractionResult(BaseModel):
-    """Result of symptom extraction from conversation"""
-    symptoms: Dict[str, Any] = Field(default_factory=dict)
-    confidence_scores: Dict[str, float] = Field(default_factory=dict)
-    extracted_entities: List[str] = Field(default_factory=list)
-    sentiment: str = Field(..., pattern="^(positive|neutral|negative)$")
-    urgency_level: str = Field(..., pattern="^(low|medium|high|urgent)$")
-    concerns: List[str] = Field(default_factory=list)
-    notes: Optional[str] = None
-    
+    """Result from symptom extraction"""
+    symptoms: Dict[str, Any]
+    confidence_scores: Dict[str, float] = {}
+    extracted_entities: List[str] = []
+    sentiment: str = "neutral"  # Ensure default value
+    urgency_level: str = "low"
+    extracted_count: int = 0
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {

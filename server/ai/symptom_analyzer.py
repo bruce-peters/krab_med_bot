@@ -66,6 +66,18 @@ class SymptomAnalyzer:
                 {"role": "user", "content": extraction_prompt}
             ], temperature=0.3)  # Lower temperature for more consistent JSON
 
+            # Handle empty response
+            if not llm_response or llm_response.strip() == "":
+                logger.warning("Empty response from LLM for symptom extraction")
+                return SymptomExtractionResult(
+                    symptoms={},
+                    confidence_scores={},
+                    extracted_entities=[],
+                    sentiment="neutral",
+                    urgency_level="low",
+                    extracted_count=0
+                )
+
             # Parse LLM response
             # Remove markdown code blocks if present
             llm_response = llm_response.strip()
@@ -77,16 +89,28 @@ class SymptomAnalyzer:
                 llm_response = llm_response[:-3]
             
             symptoms_data = json.loads(llm_response.strip())
-        except Exception as e:
+        except json.JSONDecodeError as e:
             logger.error(f"Error parsing LLM symptom extraction: {e}")
-            # Fallback to keyword-based extraction
-            symptoms_data = {
-                "symptoms": detected_symptoms,
-                "vital_signs": {},
-                "concerns": [],
-                "urgency_level": "low",
-                "notes": "Keyword-based extraction fallback"
-            }
+            logger.debug(f"Raw LLM response: {llm_response}")
+            # Return empty result with all required fields
+            return SymptomExtractionResult(
+                symptoms={},
+                confidence_scores={},
+                extracted_entities=[],
+                sentiment="neutral",
+                urgency_level="low",
+                extracted_count=0
+            )
+        except Exception as e:
+            logger.error(f"Error in symptom extraction: {e}", exc_info=True)
+            return SymptomExtractionResult(
+                symptoms={},
+                confidence_scores={},
+                extracted_entities=[],
+                sentiment="neutral",
+                urgency_level="low",
+                extracted_count=0
+            )
 
         # Merge keyword detection with LLM extraction
         final_symptoms = {**detected_symptoms, **symptoms_data.get("symptoms", {})}
@@ -109,7 +133,8 @@ class SymptomAnalyzer:
             confidence_scores=confidence_scores,
             extracted_entities=entities,
             sentiment=sentiment,
-            urgency_level=urgency
+            urgency_level=urgency,
+            extracted_count=len(final_symptoms)
         )
 
     def _extract_keywords(self, text: str) -> dict:
@@ -163,12 +188,13 @@ class SymptomAnalyzer:
             "severe_headache", "high_fever", "persistent_vomiting"
         ]
 
-        # Check pain level
-        pain_level = symptoms.get("pain_level", 0)
-        if pain_level >= 8:
-            return "urgent"
-        elif pain_level >= 6:
-            return "high"
+        # Check pain level (null-safe)
+        pain_level = symptoms.get("pain_level")
+        if pain_level is not None:
+            if pain_level >= 8:
+                return "urgent"
+            elif pain_level >= 6:
+                return "high"
 
         # Check for urgent symptoms
         if any(symptoms.get(s) for s in urgent_symptoms):

@@ -107,7 +107,7 @@ class ConversationManager:
             ai_response = await llm_client.generate_response(
                 context,
                 temperature=settings.llm_temperature,
-                max_tokens=settings.llm_max_tokens
+                # max_tokens=settings.llm_max_tokens
             )
         except Exception as e:
             logger.error(f"Error generating AI response: {e}")
