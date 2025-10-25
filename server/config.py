@@ -36,14 +36,14 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     
     # LLM Model Settings
-    llm_model: str = "gemini-2.5-flash"  # Latest model with better safety handling
+    llm_model: str = "gpt-4"  # Latest model with better safety handling
     llm_temperature: float = 0.7
     llm_max_tokens: int = 100000
     
     # Speech Settings
-    stt_provider: str = "mock"  # "openai", "whisper_local", "mock"
-    tts_provider: str = "mock"  # "openai", "elevenlabs", "local", "mock"
-    tts_voice: str = "alloy"  # OpenAI TTS voice
+    stt_provider: str = "openai"  # "openai", "gemini", "whisper_local", "mock"
+    tts_provider: str = "openai"  # "openai", "local", "elevenlabs", "mock"
+    tts_voice: str = "echo"  # Voice name (for providers that support it)
     
     # Conversation Settings
     conversation_context_window: int = 10  # Last N messages to include

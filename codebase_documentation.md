@@ -207,9 +207,15 @@ async def shutdown_event():
 
 4. **Speech Settings**
 
-   - `stt_provider`: Speech-to-text provider
-   - `tts_provider`: Text-to-speech provider
+   - `stt_provider`: Speech-to-text provider ("openai", "gemini", "whisper_local", "mock")
+   - `tts_provider`: Text-to-speech provider ("openai", "gemini", "elevenlabs", "local", "mock")
    - `tts_voice`: Voice selection for TTS
+
+**Speech Providers**:
+
+- **Gemini**: Uses Gemini 2.0 Flash multimodal for audio transcription (STT only, TTS falls back to OpenAI)
+- **OpenAI**: Whisper for STT, TTS-1 for TTS (high quality, paid)
+- **Mock**: Testing mode with placeholder responses
 
 5. **Feature Flags**
    - `enable_voice_interaction`: Enable/disable voice
@@ -325,7 +331,7 @@ LLM_TEMPERATURE=0.7
 LLM_MAX_TOKENS=500
 
 # Speech
-STT_PROVIDER=openai
+STT_PROVIDER=gemini
 TTS_PROVIDER=openai
 TTS_VOICE=alloy
 

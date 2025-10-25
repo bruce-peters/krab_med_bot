@@ -17,7 +17,12 @@ dotenv
 openai==1.10.0              # OpenAI API client
 anthropic==0.18.0           # Claude API client (optional)
 tiktoken==0.5.2             # Token counting for OpenAI
-google-generativeai>=0.3.0
+google-generativeai>=0.8.0  # Updated for audio support
+
+# Speech/Audio
+pyttsx3>=2.90  # Local text-to-speech (no API needed)
+pygame>=2.5.0  # For local audio playback (testing)
+playsound
 
 # spaCy requires compatible version - OPTIONAL (comment out for now)
 # spacy>=3.7.2                # NLP for symptom extraction (has pydantic v1 conflict)

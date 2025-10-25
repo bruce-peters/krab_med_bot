@@ -1,258 +1,425 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
+"""
+Voice Interaction Routes
+Handles voice-based conversations with speech-to-text and text-to-speech
+"""
+
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from server.models.schemas import VoiceInteractionRequest, VoiceInteractionResponse
-from server.ai.speech import speech_service
 from server.ai.conversation import conversation_manager
-from server.ai.symptom_analyzer import symptom_analyzer
-from server.ai.recommendation import recommendation_engine
-from server.config import settings
-import base64
-import logging
+from server.ai.speech import speech_service
+from uuid import UUID
 from typing import Optional
+import logging
+import base64
 
 logger = logging.getLogger(__name__)
-
 router = APIRouter(prefix="/api/voice", tags=["voice"])
 
-
 @router.post("/interact", response_model=VoiceInteractionResponse)
-async def voice_interaction(request: VoiceInteractionRequest):
+async def voice_interact(
+    session_id: Optional[str] = Form(None),
+    audio_data: Optional[str] = Form(None),
+    text_input: Optional[str] = Form(None),
+    medication_id: Optional[str] = Form(None)
+):
     """
-    Handle voice interaction with AI
-    - Accepts audio or text input
-    - Returns AI response as audio and text
-    - Extracts symptoms automatically
-    - Generates personalized recommendations
+    Complete voice interaction cycle
+    
+    Flow:
+    1. Convert speech to text (if audio provided)
+    2. Get AI response from conversation
+    3. Convert response to speech
+    4. Return text + audio response
+    
+    Usage:
+        # Start new conversation
+        POST /api/voice/interact
+        {
+            "text_input": "I'm feeling okay",
+            "medication_id": "uuid-or-null"
+        }
+        
+        # Continue conversation
+        POST /api/voice/interact
+        {
+            "session_id": "session-uuid",
+            "text_input": "I have a headache"
+        }
     """
     try:
-        # Convert audio to text if provided
-        if request.audio_data:
-            logger.info("Processing audio input for transcription")
-            user_text = await speech_service.speech_to_text(
-                request.audio_data,
-                language=request.language
+        # Convert session_id and medication_id from string to UUID if provided
+        session_uuid = UUID(session_id) if session_id else None
+        medication_uuid = UUID(medication_id) if medication_id else None
+        
+        # Start or get existing session
+        if session_uuid is None:
+            session = await conversation_manager.start_session(medication_uuid)
+            session_uuid = session.session_id
+            
+            # Generate greeting
+            greeting = await conversation_manager.generate_response(
+                session_uuid,
+                "User has started voice interaction."
             )
-            logger.info(f"Transcribed text: {user_text}")
-        elif request.text_input:
-            user_text = request.text_input
-            logger.info(f"Processing text input: {user_text}")
-        else:
+            
+            # Convert greeting to speech
+            greeting_audio = await speech_service.text_to_speech(greeting)
+            
+            return VoiceInteractionResponse(
+                session_id=session_uuid,
+                ai_response_text=greeting,
+                ai_response_audio=greeting_audio,
+                extracted_symptoms=None,
+                recommendations=None,
+                follow_up_questions=_generate_follow_ups(greeting)
+            )
+        
+        # Process user input
+        user_text = text_input
+        if audio_data and not user_text:
+            # Convert speech to text
+            logger.info("Converting speech to text...")
+            user_text = await speech_service.speech_to_text(audio_data)
+            logger.info(f"Transcribed: {user_text[:100]}...")
+        
+        if not user_text:
             raise HTTPException(
                 status_code=400,
                 detail="Either audio_data or text_input must be provided"
             )
-
-        # Start or continue conversation
-        # For simplicity, create new session each time (could track session)
-        session = await conversation_manager.start_session(
-            "voice_user",
-            request.medication_id
-        )
-        logger.info(f"Started conversation session: {session.session_id}")
-
-        # Generate AI response
-        ai_text = await conversation_manager.generate_response(
-            session.session_id,
-            user_text
-        )
-        logger.info(f"Generated AI response: {ai_text}")
-
+        
+        # Get AI response
+        ai_response = await conversation_manager.generate_response(session_uuid, user_text)
+        
         # Convert response to speech
-        ai_audio = None
-        if settings.enable_voice_interaction:
+        response_audio = await speech_service.text_to_speech(ai_response)
+        
+        # Get current session for symptom extraction (lightweight check)
+        session = conversation_manager.active_sessions.get(session_uuid)
+        current_symptoms = None
+        if session and len(session.messages) > 4:  # After a few exchanges
+            from server.ai.symptom_analyzer import symptom_analyzer
             try:
-                ai_audio = await speech_service.text_to_speech(
-                    ai_text,
-                    voice=settings.tts_voice
-                )
-                logger.info("Generated audio response")
+                conversation_text = "\n".join([
+                    f"{msg.role}: {msg.content}"
+                    for msg in session.messages[-6:]  # Last 6 messages
+                    if msg.role != "system"
+                ])
+                symptoms = await symptom_analyzer.extract_symptoms(conversation_text)
+                if symptoms.symptoms:
+                    current_symptoms = symptoms.symptoms
             except Exception as e:
-                logger.error(f"TTS conversion failed: {e}")
-                # Continue without audio - still return text response
-
-        # Extract symptoms if auto-extraction enabled
-        extracted_symptoms = None
-        recommendations = None
-        if settings.auto_symptom_extraction:
-            logger.info("Extracting symptoms from conversation")
-            conversation_text = f"User: {user_text}\nAI: {ai_text}"
-            symptom_result = await symptom_analyzer.extract_symptoms(conversation_text)
-            extracted_symptoms = symptom_result.symptoms
-
-            if extracted_symptoms:
-                logger.info(f"Extracted symptoms: {extracted_symptoms}")
-                # Generate recommendations based on symptoms
-                recommendations_list = await recommendation_engine.generate_recommendations(
-                    extracted_symptoms,
-                    {}  # TODO: Get user history from database
-                )
-                recommendations = [r.recommendation_text for r in recommendations_list]
-                logger.info(f"Generated {len(recommendations)} recommendations")
-
-        # Generate contextual follow-up questions based on conversation
-        follow_ups = _generate_follow_up_questions(user_text, extracted_symptoms)
-
+                logger.warning(f"Lightweight symptom extraction failed: {e}")
+        
         return VoiceInteractionResponse(
-            session_id=session.session_id,
-            ai_response_text=ai_text,
-            ai_response_audio=ai_audio,
-            extracted_symptoms=extracted_symptoms,
-            recommendations=recommendations,
-            follow_up_questions=follow_ups[:2]  # Limit to 2
+            session_id=session_uuid,
+            ai_response_text=ai_response,
+            ai_response_audio=response_audio,
+            extracted_symptoms=current_symptoms,
+            recommendations=None,  # Only provided at end of conversation
+            follow_up_questions=_generate_follow_ups(ai_response)
         )
-
-    except HTTPException:
-        raise
+        
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Conversation session not found")
     except Exception as e:
-        logger.error(f"Voice interaction error: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Voice interaction failed: {str(e)}"
-        )
+        logger.error(f"Error in voice interaction: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Voice interaction failed: {str(e)}")
 
-
-@router.post("/upload-audio")
-async def upload_audio_file(
-    file: UploadFile = File(...),
-    language: str = "en"
+@router.post("/interact/file")
+async def voice_interact_file(
+    session_id: Optional[str] = Form(None),
+    medication_id: Optional[str] = Form(None),
+    audio_file: UploadFile = File(...)
 ):
     """
-    Upload audio file for transcription
-    Alternative to base64 encoding for larger files
-    Supports: WAV, MP3, M4A, WEBM
+    Voice interaction with audio file upload
+    
+    Usage:
+        curl -X POST http://localhost:5000/api/voice/interact/file \
+          -F "audio_file=@recording.wav" \
+          -F "session_id=uuid-here"
     """
     try:
-        # Validate file type
-        allowed_types = ["audio/wav", "audio/mpeg", "audio/mp4", "audio/webm"]
-        if file.content_type not in allowed_types:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unsupported audio format. Allowed: {allowed_types}"
-            )
-
-        logger.info(f"Uploading audio file: {file.filename}")
-
-        # Read audio bytes
-        audio_bytes = await file.read()
+        # Read audio file and convert to base64
+        audio_bytes = await audio_file.read()
         audio_base64 = base64.b64encode(audio_bytes).decode('utf-8')
-
-        # Transcribe
-        transcription = await speech_service.speech_to_text(
-            audio_base64,
-            language=language
+        
+        # Use main interact endpoint logic
+        return await voice_interact(
+            session_id=session_id,
+            audio_data=audio_base64,
+            text_input=None,
+            medication_id=medication_id
         )
-
-        logger.info(f"Transcription successful: {transcription}")
-
-        return {
-            "transcription": transcription,
-            "filename": file.filename,
-            "language": language
-        }
-
-    except HTTPException:
-        raise
+        
     except Exception as e:
-        logger.error(f"Audio upload error: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Audio upload failed: {str(e)}"
-        )
+        logger.error(f"Error processing audio file: {e}")
+        raise HTTPException(status_code=500, detail=f"Audio processing failed: {str(e)}")
 
-
-@router.post("/text-to-speech")
-async def convert_text_to_speech(
-    text: str,
-    voice: Optional[str] = None
+@router.post("/interact/test")
+async def voice_interact_test(
+    session_id: Optional[str] = Form(None),
+    text_input: str = Form(...),
+    medication_id: Optional[str] = Form(None),
+    play_audio: bool = Form(True)
 ):
     """
-    Convert text to speech audio
-    Returns base64 encoded audio
+    Test voice interaction with local audio playback
+    
+    This endpoint is for testing - it plays the AI response audio locally
+    on the server instead of returning base64.
+    
+    Usage:
+        curl -X POST http://localhost:5000/api/voice/interact/test \
+          -F "text_input=I have a headache" \
+          -F "play_audio=true"
     """
     try:
-        if not text or len(text.strip()) == 0:
-            raise HTTPException(
-                status_code=400,
-                detail="Text cannot be empty"
+        # Convert session_id and medication_id from string to UUID if provided
+        session_uuid = UUID(session_id) if session_id else None
+        medication_uuid = UUID(medication_id) if medication_id else None
+        
+        # Start or get existing session
+        if session_uuid is None:
+            session = await conversation_manager.start_session(medication_uuid)
+            session_uuid = session.session_id
+            
+            # Generate greeting
+            greeting = await conversation_manager.generate_response(
+                session_uuid,
+                "User has started voice interaction."
             )
-
-        voice_to_use = voice or settings.tts_voice
-
-        logger.info(f"Converting text to speech with voice: {voice_to_use}")
-
-        audio_base64 = await speech_service.text_to_speech(
-            text,
-            voice=voice_to_use
-        )
-
+            
+            # Play audio locally if requested
+            if play_audio:
+                greeting_audio = await speech_service.text_to_speech(greeting)
+                await _play_audio_locally(greeting_audio)
+            
+            return {
+                "session_id": str(session_uuid),
+                "ai_response_text": greeting,
+                "audio_played_locally": play_audio,
+                "follow_up_questions": _generate_follow_ups(greeting)
+            }
+        
+        # Get AI response
+        ai_response = await conversation_manager.generate_response(session_uuid, text_input)
+        
+        # Play audio locally if requested
+        if play_audio:
+            response_audio = await speech_service.text_to_speech(ai_response)
+            await _play_audio_locally(response_audio)
+        
+        # Get current session for symptom extraction
+        session = conversation_manager.active_sessions.get(session_uuid)
+        current_symptoms = None
+        if session and len(session.messages) > 4:
+            from server.ai.symptom_analyzer import symptom_analyzer
+            try:
+                conversation_text = "\n".join([
+                    f"{msg.role}: {msg.content}"
+                    for msg in session.messages[-6:]
+                    if msg.role != "system"
+                ])
+                symptoms = await symptom_analyzer.extract_symptoms(conversation_text)
+                if symptoms.symptoms:
+                    current_symptoms = symptoms.symptoms
+            except Exception as e:
+                logger.warning(f"Lightweight symptom extraction failed: {e}")
+        
         return {
-            "audio_data": audio_base64,
-            "text": text,
-            "voice": voice_to_use
+            "session_id": str(session_uuid),
+            "user_input": text_input,
+            "ai_response_text": ai_response,
+            "audio_played_locally": play_audio,
+            "extracted_symptoms": current_symptoms,
+            "follow_up_questions": _generate_follow_ups(ai_response)
         }
-
-    except HTTPException:
-        raise
+        
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Conversation session not found")
     except Exception as e:
-        logger.error(f"TTS conversion error: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=f"TTS conversion failed: {str(e)}"
+        logger.error(f"Error in test voice interaction: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Voice interaction failed: {str(e)}")
+
+@router.post("/conversation/{session_id}/end")
+async def end_voice_conversation(session_id: UUID):
+    """
+    End voice conversation with analysis
+    
+    Uses centralized conversation ending logic.
+    Returns analysis with TTS audio for closing message and recommendations.
+    
+    Usage:
+        POST /api/voice/conversation/{session_id}/end
+    """
+    try:
+        # Use centralized conversation ending logic
+        result = await conversation_manager.end_session_with_analysis(session_id)
+        
+        # Generate closing message based on urgency
+        closing_message = _generate_closing_message(
+            result["urgency_level"],
+            result["symptoms"].sentiment
         )
+        
+        # Convert closing message to speech
+        closing_audio = await speech_service.text_to_speech(closing_message)
+        
+        # Convert recommendations to speech (first 3 only)
+        recommendation_audio = []
+        for rec in result["recommendations"][:3]:
+            audio = await speech_service.text_to_speech(rec.recommendation_text)
+            recommendation_audio.append({
+                "text": rec.recommendation_text,
+                "audio": audio,
+                "category": rec.category
+            })
+        
+        return {
+            **result,
+            "closing_message": closing_message,
+            "closing_audio": closing_audio,
+            "recommendation_audio": recommendation_audio
+        }
+        
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Conversation session not found")
+    except Exception as e:
+        logger.error(f"Error ending voice conversation: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to end voice conversation: {str(e)}")
 
-
-@router.get("/voices")
-async def list_available_voices():
+@router.post("/conversation/{session_id}/end/test")
+async def end_voice_conversation_test(
+    session_id: UUID,
+    play_audio: bool = True
+):
     """
-    List available TTS voices
+    End voice conversation with local audio playback (for testing)
+    
+    Plays the closing message and recommendations locally instead of returning base64.
     """
-    # OpenAI TTS voices
-    openai_voices = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"]
+    try:
+        # Use centralized conversation ending logic
+        result = await conversation_manager.end_session_with_analysis(session_id)
+        
+        # Generate closing message
+        closing_message = _generate_closing_message(
+            result["urgency_level"],
+            result["symptoms"].sentiment
+        )
+        
+        # Play closing message locally if requested
+        if play_audio:
+            closing_audio = await speech_service.text_to_speech(closing_message)
+            await _play_audio_locally(closing_audio)
+            
+            # Also play first recommendation
+            if result["recommendations"]:
+                rec_text = f"Recommendation: {result['recommendations'][0].recommendation_text}"
+                rec_audio = await speech_service.text_to_speech(rec_text)
+                await _play_audio_locally(rec_audio)
+        
+        return {
+            "session_id": session_id,
+            "symptoms": result["symptoms"],
+            "recommendations": result["recommendations"],
+            "urgency_level": result["urgency_level"],
+            "closing_message": closing_message,
+            "audio_played_locally": play_audio,
+            "conversation_summary": result["conversation_summary"]
+        }
+        
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Conversation session not found")
+    except Exception as e:
+        logger.error(f"Error ending test voice conversation: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to end voice conversation: {str(e)}")
 
-    return {
-        "provider": settings.tts_provider,
-        "voices": openai_voices if settings.tts_provider == "openai" else [],
-        "current_voice": settings.tts_voice
-    }
-
-
-def _generate_follow_up_questions(
-    user_text: str,
-    symptoms: Optional[dict]
-) -> list[str]:
+@router.get("/session/{session_id}/status")
+async def get_voice_session_status(session_id: UUID):
     """
-    Generate contextual follow-up questions based on conversation
+    Get current status of voice session
+    
+    Returns conversation state and message count
     """
-    user_text_lower = user_text.lower()
-    questions = []
+    try:
+        session = conversation_manager.active_sessions.get(session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        return {
+            "session_id": session_id,
+            "started_at": session.started_at,
+            "message_count": len(session.messages),
+            "user_message_count": len([m for m in session.messages if m.role == "user"]),
+            "is_active": session.ended_at is None,
+            "medication_id": session.medication_id
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting session status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-    # Pain-related follow-ups
-    if any(word in user_text_lower for word in ["pain", "hurt", "ache"]):
-        if not symptoms or "pain_level" not in symptoms:
-            questions.append("How would you rate your pain on a scale of 1 to 10?")
-        questions.append("Where exactly does it hurt?")
-
-    # Sleep-related follow-ups
-    if any(word in user_text_lower for word in ["tired", "sleep", "rest"]):
-        questions.append("Did you sleep well last night?")
-        questions.append("How many hours of sleep did you get?")
-
-    # Digestive-related follow-ups
-    if any(word in user_text_lower for word in ["nausea", "stomach", "appetite"]):
-        questions.append("How is your appetite today?")
-        questions.append("Have you been able to eat normally?")
-
-    # Mood-related follow-ups
-    if any(word in user_text_lower for word in ["sad", "anxious", "worried", "stressed"]):
-        questions.append("Is there anything specific that's bothering you?")
-        questions.append("Would you like to talk about how you're feeling?")
-
-    # General follow-ups if no specific topics detected
-    if not questions:
-        questions = [
-            "How are you feeling overall today?",
-            "Are you experiencing any discomfort?",
-            "Is there anything else you'd like to share?"
+def _generate_follow_ups(ai_response: str) -> list:
+    """Generate contextual follow-up questions based on AI response"""
+    response_lower = ai_response.lower()
+    
+    follow_ups = []
+    
+    if "pain" in response_lower:
+        follow_ups.append("Where exactly is the pain located?")
+        follow_ups.append("Is the pain constant or does it come and go?")
+    
+    if "sleep" in response_lower:
+        follow_ups.append("What time did you go to bed?")
+        follow_ups.append("Did anything wake you up during the night?")
+    
+    if "feeling" in response_lower or "how are" in response_lower:
+        follow_ups.append("Have you noticed any changes since yesterday?")
+        follow_ups.append("Is there anything bothering you today?")
+    
+    # Default follow-ups
+    if not follow_ups:
+        follow_ups = [
+            "Is there anything else you'd like to share?",
+            "How is your energy level today?"
         ]
+    
+    return follow_ups[:2]  # Return max 2 follow-ups
 
-    return questions
+def _generate_closing_message(urgency_level: str, sentiment: str) -> str:
+    """Generate appropriate closing message based on analysis"""
+    if urgency_level == "urgent":
+        return "I'm concerned about what you've shared. Please contact your doctor right away or have someone call for help. Take care."
+    
+    elif urgency_level == "high":
+        return "Thank you for sharing. I recommend calling your doctor today to discuss how you're feeling. Take it easy and rest."
+    
+    elif urgency_level == "medium":
+        return "Thank you for the conversation. Please follow the suggestions I provided and don't hesitate to call your doctor if you need to."
+    
+    else:  # low
+        if sentiment == "positive":
+            return "It's wonderful to hear you're doing well! Keep up the good work with your medications. Have a great day!"
+        else:
+            return "Thank you for sharing. Remember to take your medication as prescribed. Take care and have a good day!"
 
+async def _play_audio_locally(audio_base64: str):
+    """
+    Play audio locally on server using pygame (for testing)
+    """
+    import tempfile
+    import base64
+    import os
+    import pygame
+    import io
+
+    # Decode base64 to bytes
+    audio_bytes = base64.b64decode(audio_base64)
+
+    pygame.mixer.init()
+    sound_file = io.BytesIO(audio_bytes)  # Fixed variable name
+    sound = pygame.mixer.Sound(sound_file)
+    sound.play()

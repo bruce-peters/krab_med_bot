@@ -10,6 +10,20 @@ import aiofiles
 from pathlib import Path
 import logging
 
+from server.ai.symptom_analyzer import symptom_analyzer
+from server.ai.recommendation import recommendation_engine
+from server.utils.json_handler import save_health_data
+from server.models.schemas import (
+    ConversationSession,
+    ConversationMessage,
+    SymptomExtractionResult,
+    HealthRecommendation,
+    HealthDataEntry,
+    AIInteraction,
+    HealthSymptoms,
+    VitalSigns
+)
+
 logger = logging.getLogger(__name__)
 
 class ConversationManager:
@@ -225,5 +239,148 @@ class ConversationManager:
                 logger.warning(f"Error loading session from {filepath}: {e}")
         
         return sessions
+
+    async def end_session_with_analysis(
+        self,
+        session_id: UUID
+    ) -> dict:
+        """
+        End conversation session with full symptom analysis and recommendations
+        
+        This is the main method that handles all conversation ending logic.
+        Used by both AI conversation endpoint and voice endpoint.
+        
+        Returns:
+            Complete analysis dict with symptoms, recommendations, and health entry
+        """
+        logger.info(f"Ending and analyzing conversation: {session_id}")
+        
+        # End the session
+        session = await self.end_session(session_id)
+        
+        # Extract conversation text (exclude system messages)
+        conversation_text = "\n".join([
+            f"{msg.role}: {msg.content}"
+            for msg in session.messages
+            if msg.role != "system"
+        ])
+        
+        # Extract symptoms using AI
+        logger.info("Extracting symptoms from conversation...")
+        try:
+            symptoms = await symptom_analyzer.extract_symptoms(conversation_text)
+        except Exception as e:
+            logger.error(f"Symptom extraction failed: {e}", exc_info=True)
+            # Create safe fallback
+            symptoms = self._create_fallback_symptoms()
+        
+        # Handle empty symptoms
+        if not symptoms or not symptoms.symptoms:
+            logger.warning("No symptoms extracted, using default values")
+            symptoms = self._create_fallback_symptoms(
+                sentiment=getattr(symptoms, 'sentiment', 'neutral')
+            )
+        
+        # Generate recommendations
+        logger.info("Generating health recommendations...")
+        try:
+            recommendations = await recommendation_engine.generate_recommendations(
+                symptoms.symptoms,
+                {}  # TODO: Get user history from storage
+            )
+        except Exception as e:
+            logger.error(f"Recommendation generation failed: {e}", exc_info=True)
+            recommendations = self._create_fallback_recommendations()
+        
+        # Build and save health data entry
+        health_entry = self._create_health_entry(session, symptoms)
+        await save_health_data(health_entry)
+        
+        logger.info(f"Conversation analysis complete. Urgency: {symptoms.urgency_level}")
+        
+        return {
+            "session_id": session_id,
+            "session": session,
+            "symptoms": symptoms,
+            "recommendations": recommendations,
+            "urgency_level": symptoms.urgency_level,
+            "health_entry_id": health_entry.entry_id,
+            "conversation_duration": (
+                (session.ended_at - session.started_at).total_seconds() 
+                if session.ended_at else 0
+            ),
+            "message_count": len(session.messages),
+            "conversation_summary": self._generate_summary(session, symptoms)
+        }
+    
+    def _create_fallback_symptoms(self, sentiment: str = "neutral") -> SymptomExtractionResult:
+        """Create fallback symptom result when extraction fails"""
+        return SymptomExtractionResult(
+            symptoms={"general_feeling": "conversation completed"},
+            confidence_scores={},
+            extracted_entities=[],
+            sentiment=sentiment,
+            urgency_level="low",
+            extracted_count=0
+        )
+    
+    def _create_fallback_recommendations(self) -> list:
+        """Create fallback recommendations when generation fails"""
+        return [
+            HealthRecommendation(
+                recommendation_text="Continue taking your medications as prescribed",
+                category="general",
+                priority="low",
+                based_on=[]
+            ),
+            HealthRecommendation(
+                recommendation_text="If you experience any concerning symptoms, contact your healthcare provider",
+                category="seek_help",
+                priority="medium",
+                based_on=[]
+            )
+        ]
+    
+    def _create_health_entry(
+        self,
+        session: ConversationSession,
+        symptoms: SymptomExtractionResult
+    ) -> HealthDataEntry:
+        """Create health data entry from session and symptoms"""
+        return HealthDataEntry(
+            medication_id=session.medication_id,
+            symptoms=HealthSymptoms(**symptoms.symptoms) if symptoms.symptoms else HealthSymptoms(),
+            vital_signs=VitalSigns(
+                mood=symptoms.symptoms.get("mood") if symptoms.symptoms else None,
+                sleep_quality=symptoms.symptoms.get("sleep_quality") if symptoms.symptoms else None,
+                appetite=symptoms.symptoms.get("appetite") if symptoms.symptoms else None
+            ),
+            ai_interaction=AIInteraction(
+                questions_asked=[m.content for m in session.messages if m.role == "assistant"],
+                responses_given=[m.content for m in session.messages if m.role == "user"],
+                conversation_summary=f"Extracted {len(symptoms.symptoms) if symptoms.symptoms else 0} symptoms. Urgency: {symptoms.urgency_level}. Sentiment: {symptoms.sentiment}"
+            )
+        )
+    
+    def _generate_summary(
+        self,
+        session: ConversationSession,
+        symptoms: SymptomExtractionResult
+    ) -> str:
+        """Generate human-readable conversation summary"""
+        user_messages = [m for m in session.messages if m.role == "user"]
+        
+        summary_parts = [
+            f"Conversation with {len(user_messages)} user responses",
+            f"Sentiment: {symptoms.sentiment}",
+            f"Urgency: {symptoms.urgency_level}"
+        ]
+        
+        if symptoms.symptoms:
+            key_symptoms = [k for k, v in symptoms.symptoms.items() if v is True][:3]
+            if key_symptoms:
+                summary_parts.append(f"Key symptoms: {', '.join(key_symptoms)}")
+        
+        return ". ".join(summary_parts) + "."
 
 conversation_manager = ConversationManager()
