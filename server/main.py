@@ -6,12 +6,13 @@ AI-powered medication management system for elderly users
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+from datetime import datetime
 import logging
 
 from server.config import settings
 from server.controllers.hardware_interface import hardware_interface
 from server.controllers.mock_hardware import mock_hardware_interface
-from server.routes import hardware, medication
+from server.routes import hardware, medication, health_data, ai_conversation, voice
 from server.utils.json_handler import initialize_data_file
 
 # Setup logging
@@ -96,6 +97,9 @@ app.add_middleware(
 # Include routers
 app.include_router(hardware.router)
 app.include_router(medication.router)
+app.include_router(health_data.router)
+app.include_router(ai_conversation.router)
+app.include_router(voice.router)
 
 
 # Root endpoint
@@ -108,7 +112,10 @@ async def root():
         "status": "running",
         "hardware_mode": settings.hardware_mode,
         "docs": "/docs",
-        "health": "/health"
+        "health": "/health",
+        "ai_enabled": True,
+        "ai_provider": settings.ai_provider,
+        "voice_enabled": settings.enable_voice_interaction
     }
 
 
@@ -129,7 +136,8 @@ async def health_check():
         "version": "1.0.0",
         "service": "Krab Med Bot API",
         "hardware_mode": settings.hardware_mode,
-        "hardware_status": hardware_status
+        "hardware_status": hardware_status,
+        "ai_provider": settings.ai_provider
     }
 
 

@@ -3,7 +3,8 @@ Configuration Management using Pydantic Settings
 """
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import List
+from typing import List, Union
+import json
 
 
 class Settings(BaseSettings):
@@ -24,8 +25,8 @@ class Settings(BaseSettings):
     data_dir: str = "./data"
     log_level: str = "INFO"
     
-    # CORS settings
-    cors_origins: List[str] = ["http://localhost:3000", "http://localhost:5173"]
+    # CORS settings - accepts JSON string or list
+    cors_origins: Union[List[str], str] = '["http://localhost:3000", "http://localhost:5173"]'
     
     # AI/LLM Settings
     ai_provider: str = "mock"  # "openai", "anthropic", "ollama", "mock"
@@ -58,6 +59,19 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore"  # Ignore extra fields in .env
     )
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Parse cors_origins if it's a JSON string
+        if isinstance(self.cors_origins, str):
+            try:
+                self.cors_origins = json.loads(self.cors_origins)
+            except json.JSONDecodeError:
+                # Fallback: split by comma
+                self.cors_origins = [
+                    origin.strip() 
+                    for origin in self.cors_origins.split(',')
+                ]
 
 
 # Create global settings instance

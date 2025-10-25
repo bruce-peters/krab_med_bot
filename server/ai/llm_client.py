@@ -6,6 +6,7 @@ from server.config import settings
 import logging
 import tiktoken
 
+
 logger = logging.getLogger(__name__)
 
 class LLMClient:

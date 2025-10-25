@@ -16,9 +16,8 @@ from server.models.schemas import (
     SuccessResponse
 )
 from server.utils.json_handler import (
-    read_json,
-    write_json,
-    append_to_json_array,
+    load_json_file,
+    save_json_file,
     update_json_entry
 )
 
@@ -42,7 +41,7 @@ async def get_medications(filter_date: Optional[date] = Query(None, alias="date"
         List of medication entries
     """
     try:
-        data = await read_json(MEDICATION_FILE)
+        data = await load_json_file(MEDICATION_FILE)
         medications = data.get("medications", [])
         
         # Convert to MedicationEntry objects
@@ -83,7 +82,7 @@ async def get_next_medication():
         Next medication entry or None if no upcoming medications
     """
     try:
-        data = await read_json(MEDICATION_FILE)
+        data = await load_json_file(MEDICATION_FILE)
         medications = data.get("medications", [])
         
         now = datetime.utcnow()
@@ -140,7 +139,7 @@ async def mark_medication_taken(mark_req: MarkTakenRequest):
         Updated medication entry
     """
     try:
-        data = await read_json(MEDICATION_FILE)
+        data = await load_json_file(MEDICATION_FILE)
         medications = data.get("medications", [])
         
         # Find the medication
@@ -155,7 +154,7 @@ async def mark_medication_taken(mark_req: MarkTakenRequest):
                 med_found = True
                 
                 # Save updated data
-                await write_json(MEDICATION_FILE, data)
+                await save_json_file(MEDICATION_FILE, data)
                 
                 # Return updated entry
                 if isinstance(med.get("scheduled_time"), str):
@@ -198,7 +197,7 @@ async def get_medication_history(
         List of medication entries matching filters
     """
     try:
-        data = await read_json(MEDICATION_FILE)
+        data = await load_json_file(MEDICATION_FILE)
         medications = data.get("medications", [])
         
         # Filter medications
@@ -252,14 +251,14 @@ async def create_medication(medication: MedicationEntry):
         Created medication entry
     """
     try:
-        data = await read_json(MEDICATION_FILE)
+        data = await load_json_file(MEDICATION_FILE)
         
         # Add to medications list
         med_dict = medication.model_dump(mode="json")
         data["medications"].append(med_dict)
         
         # Save
-        await write_json(MEDICATION_FILE, data)
+        await save_json_file(MEDICATION_FILE, data)
         
         logger.info(f"✓ Created medication: {medication.name}")
         return medication
@@ -281,7 +280,7 @@ async def delete_medication(medication_id: UUID):
         Success response
     """
     try:
-        data = await read_json(MEDICATION_FILE)
+        data = await load_json_file(MEDICATION_FILE)
         medications = data.get("medications", [])
         
         # Find and remove medication
@@ -298,7 +297,7 @@ async def delete_medication(medication_id: UUID):
             )
         
         # Save
-        await write_json(MEDICATION_FILE, data)
+        await save_json_file(MEDICATION_FILE, data)
         
         logger.info(f"✓ Deleted medication: {medication_id}")
         return SuccessResponse(

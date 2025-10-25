@@ -1,4 +1,10 @@
-// ...existing imports...
+from typing import List
+import logging
+from server.models.schemas import HealthRecommendation
+from server.ai.llm_client import llm_client
+from server.ai.prompts import get_recommendation_prompt
+
+logger = logging.getLogger(__name__)
 
 class RecommendationEngine:
     def __init__(self):
@@ -77,4 +83,120 @@ class RecommendationEngine:
 
                 # Categorize
                 category = self._categorize_recommendation(clean_line)
-               
+                priority = self._assess_priority(clean_line, symptoms)
+
+                rec = HealthRecommendation(
+                    recommendation_text=clean_line,
+                    category=category,
+                    priority=priority,
+                    based_on=list(symptoms.keys())
+                )
+                recommendations.append(rec)
+
+        return recommendations[:5]  # Limit to top 5 recommendations
+
+    def _generate_template_recommendations(self, symptoms: dict) -> List[HealthRecommendation]:
+        """Generate recommendations using templates as fallback"""
+        recommendations = []
+        
+        # Pain recommendations
+        if symptoms.get("pain_level", 0) > 3:
+            rec = HealthRecommendation(
+                recommendation_text="Rest in a comfortable position. Apply a warm compress if appropriate for your type of pain.",
+                category="rest",
+                priority="medium",
+                based_on=["pain_level"]
+            )
+            recommendations.append(rec)
+        
+        # Fatigue recommendations
+        if symptoms.get("fatigue"):
+            rec = HealthRecommendation(
+                recommendation_text=self.templates["rest_fatigue"],
+                category="rest",
+                priority="medium",
+                based_on=["fatigue"]
+            )
+            recommendations.append(rec)
+        
+        # Hydration for various symptoms
+        if any(symptoms.get(s) for s in ["nausea", "dizziness", "fatigue"]):
+            rec = HealthRecommendation(
+                recommendation_text=self.templates["hydration_medium"],
+                category="hydration",
+                priority="medium",
+                based_on=["nausea", "dizziness"]
+            )
+            recommendations.append(rec)
+        
+        return recommendations
+
+    def _categorize_recommendation(self, text: str) -> str:
+        """Categorize recommendation"""
+        text_lower = text.lower()
+        if any(word in text_lower for word in ["water", "drink", "hydrate", "fluid"]):
+            return "hydration"
+        elif any(word in text_lower for word in ["rest", "sleep", "relax", "lie down", "nap"]):
+            return "rest"
+        elif any(word in text_lower for word in ["walk", "exercise", "move", "stretch", "activity"]):
+            return "activity"
+        elif any(word in text_lower for word in ["doctor", "physician", "medical", "call", "contact", "emergency"]):
+            return "seek_help"
+        elif any(word in text_lower for word in ["eat", "food", "meal", "nutrition"]):
+            return "nutrition"
+        else:
+            return "general"
+
+    def _assess_priority(self, text: str, symptoms: dict) -> str:
+        """Assess recommendation priority"""
+        text_lower = text.lower()
+        
+        # High priority keywords
+        if any(word in text_lower for word in ["immediately", "urgent", "emergency", "right away", "call doctor"]):
+            return "high"
+        
+        # Check symptom severity
+        if symptoms.get("pain_level", 0) >= 7:
+            return "high"
+        
+        # Medium priority
+        if any(word in text_lower for word in ["today", "soon", "important", "should"]):
+            return "medium"
+        
+        # Default to low
+        return "low"
+
+    def _needs_urgent_care(self, symptoms: dict) -> bool:
+        """Determine if symptoms require urgent medical attention"""
+        urgent_symptoms = [
+            "chest_pain",
+            "difficulty_breathing",
+            "shortness_of_breath",
+            "confusion",
+            "sudden_weakness"
+        ]
+        
+        # Check for urgent symptoms
+        if any(symptoms.get(s) for s in urgent_symptoms):
+            return True
+        
+        # Check pain level
+        if symptoms.get("pain_level", 0) >= 8:
+            return True
+        
+        return False
+
+    async def prioritize_recommendations(
+        self,
+        recommendations: List[HealthRecommendation]
+    ) -> List[HealthRecommendation]:
+        """Sort recommendations by priority"""
+        priority_order = {"high": 0, "medium": 1, "low": 2}
+        
+        return sorted(
+            recommendations,
+            key=lambda r: priority_order.get(r.priority, 3)
+        )
+
+# Create singleton instance
+recommendation_engine = RecommendationEngine()

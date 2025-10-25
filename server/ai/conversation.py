@@ -1,6 +1,7 @@
 from server.models.schemas import ConversationSession, ConversationMessage
 from server.ai.prompts import get_system_prompt
 from server.ai.llm_client import llm_client
+from server.config import settings
 from typing import Dict, List, Optional
 from uuid import UUID
 from datetime import datetime

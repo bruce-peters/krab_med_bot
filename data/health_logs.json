@@ -1,0 +1,25 @@
+[
+  {
+    "entry_id": "9f9eb102-65d5-457b-91da-86ac45ebf5b2",
+    "timestamp": "2025-10-25T19:45:49.938302",
+    "user_id": "user_001",
+    "medication_id": "550e8400-e29b-41d4-a716-446655440000",
+    "symptoms": {
+      "pain_level": 2,
+      "nausea": false,
+      "dizziness": false,
+      "fatigue": true,
+      "headache": false,
+      "shortness_of_breath": false,
+      "custom_notes": null,
+      "other_symptoms": []
+    },
+    "vital_signs": {
+      "mood": "good",
+      "sleep_quality": "good",
+      "appetite": null,
+      "energy_level": null
+    },
+    "ai_interaction": null
+  }
+]

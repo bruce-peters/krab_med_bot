@@ -16,115 +16,158 @@ from server.models.schemas import (
     ErrorResponse
 )
 
+from server.ai.conversation import conversation_manager
+from server.utils.json_handler import append_to_json_file
+from server.config import settings
+from uuid import UUID, uuid4
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/hardware", tags=["hardware"])
 
 
 @router.post("/dispense", response_model=DispensingEvent)
-async def dispense_medication(request: Request, dispense_req: DispenseRequest):
+async def dispense_medication(request_body: DispenseRequest, api_request: Request):
     """
     Dispense medication from specified compartment
     
-    Steps:
-    1. Turn on LED for the compartment
-    2. Open servo motor
-    3. Log the dispensing event
-    4. Return event details
-    
-    Args:
-        dispense_req: Contains compartment number and medication ID
-    
-    Returns:
-        DispensingEvent with status and details
+    - Activates LED for visual guidance
+    - Opens compartment via servo controller
+    - Starts AI conversation for health check-in
+    - Logs dispensing event
     """
-    hardware = request.app.state.hardware
+    event_id = uuid4()
+    hardware = api_request.app.state.hardware
     
     try:
-        logger.info(f"Dispensing medication from compartment {dispense_req.compartment}")
+        logger.info(f"Dispensing medication from compartment {request_body.compartment}")
         
-        # Step 1: Turn on LED
-        led_result = await hardware.turn_on_led(dispense_req.compartment)
-        led_activated = led_result.get("status") == "success"
+        # Activate LED for compartment
+        await hardware.turn_on_led(request_body.compartment)
+        logger.debug(f"LED activated for compartment {request_body.compartment}")
         
-        # Step 2: Open servo
-        servo_result = await hardware.open_servo(dispense_req.compartment)
-        box_opened = servo_result.get("status") == "success"
+        # Send command to servo controller (open box)
+        servo_response = await hardware.open_servo(request_body.compartment)
+        
+        if servo_response.get("status") != "success":
+            await hardware.show_error_pattern(request_body.compartment)
+            raise Exception(f"Servo open failed: {servo_response.get('message')}")
+        
+        logger.info("Servo opened successfully")
+        
+        # Start AI conversation automatically
+        conversation_session = None
+        ai_greeting = None
+        
+        try:
+            conversation_session = await conversation_manager.start_session(
+                user_id="current_user",  # TODO: Get from authentication
+                medication_id=request_body.medication_id
+            )
+            
+            # Generate greeting
+            ai_greeting = await conversation_manager.generate_response(
+                conversation_session.session_id,
+                "User is taking medication now from the box."
+            )
+            
+            logger.info(f"Started AI conversation {conversation_session.session_id}")
+        except Exception as e:
+            logger.warning(f"Failed to start AI conversation: {e}")
+            # Continue without AI - not critical
+        
+        # Show success pattern
+        await hardware.show_success_pattern(request_body.compartment)
         
         # Create dispensing event
         event = DispensingEvent(
-            compartment=dispense_req.compartment,
-            medication_id=dispense_req.medication_id,
-            status="success" if (led_activated and box_opened) else "failed",
-            box_opened=box_opened,
-            led_activated=led_activated,
-            servo_response=str(servo_result),
-            error_message=None
+            event_id=event_id,
+            timestamp=datetime.utcnow(),
+            compartment=request_body.compartment,
+            medication_id=request_body.medication_id,
+            status="success",
+            box_opened=True,
+            led_activated=True,
+            servo_response=str(servo_response)
         )
         
-        logger.info(f"✓ Successfully dispensed from compartment {dispense_req.compartment}")
-        return event
+        # Add AI conversation info to event
+        event_dict = event.model_dump()
+        event_dict["conversation_session_id"] = str(conversation_session.session_id) if conversation_session else None
+        event_dict["ai_greeting"] = ai_greeting
+        
+        # Save event to logs
+        await append_to_json_file(
+            f"{settings.data_dir}/dispensing_events.json",
+            event_dict,
+            max_entries=1000
+        )
+        
+        # Return event with AI info
+        return {
+            **event_dict,
+            "conversation_started": conversation_session is not None
+        }
         
     except Exception as e:
-        logger.error(f"✗ Failed to dispense medication: {e}")
+        logger.error(f"Error dispensing medication: {e}")
+        
+        # Show error pattern
+        await hardware.show_error_pattern(request_body.compartment)
+        await hardware.clear_all_leds()
         
         # Create failed event
-        event = DispensingEvent(
-            compartment=dispense_req.compartment,
-            medication_id=dispense_req.medication_id,
+        failed_event = DispensingEvent(
+            event_id=event_id,
+            timestamp=datetime.utcnow(),
+            compartment=request_body.compartment,
+            medication_id=request_body.medication_id,
             status="failed",
             box_opened=False,
-            led_activated=False,
-            servo_response=None,
+            led_activated=True,
             error_message=str(e)
         )
         
-        raise HTTPException(
-            status_code=503,
-            detail=f"Hardware error: {str(e)}"
+        # Save failed event
+        await append_to_json_file(
+            f"{settings.data_dir}/dispensing_events.json",
+            failed_event.model_dump(),
+            max_entries=1000
         )
+        
+        raise HTTPException(status_code=500, detail=f"Dispensing failed: {str(e)}")
 
 
-@router.post("/close", response_model=SuccessResponse)
+@router.post("/close")
 async def close_box(request: Request):
     """
     Close the medication box
     
-    Steps:
-    1. Send close command to servo
-    2. Turn off all LEDs
-    3. Log the closure
-    
-    Returns:
-        Success response with timestamp
+    - Sends close command to servo
+    - Clears all LEDs
     """
     hardware = request.app.state.hardware
     
     try:
-        logger.info("Closing medication box")
+        # Clear LEDs first
+        await hardware.clear_all_leds()
         
-        # Close servo
-        servo_result = await hardware.close_servo()
+        # Send close command to servo
+        servo_response = await hardware.close_servo()
         
-        # Turn off all LEDs
-        led_result = await hardware.clear_all_leds()
+        if servo_response.get("status") != "success":
+            raise Exception(f"Servo close failed: {servo_response.get('message')}")
         
-        return SuccessResponse(
-            success=True,
-            message="Medication box closed successfully",
-            data={
-                "servo_confirmed": servo_result.get("status") == "success",
-                "leds_cleared": led_result.get("status") == "success",
-                "timestamp": datetime.utcnow().isoformat()
-            }
-        )
+        logger.info("Box closed successfully")
         
+        return {
+            "status": "success",
+            "message": "Box closed",
+            "servo_response": servo_response
+        }
     except Exception as e:
-        logger.error(f"✗ Failed to close box: {e}")
-        raise HTTPException(
-            status_code=503,
-            detail=f"Hardware error: {str(e)}"
-        )
+        logger.error(f"Error closing box: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to close box: {str(e)}")
 
 
 @router.get("/status", response_model=HardwareStatus)
@@ -136,9 +179,6 @@ async def get_hardware_status(request: Request):
     - Servo motor (position, operational status)
     - All LEDs (on/off state for each compartment)
     - Last update timestamp
-    
-    Returns:
-        HardwareStatus with servo and LED information
     """
     hardware = request.app.state.hardware
     
@@ -152,13 +192,7 @@ async def get_hardware_status(request: Request):
         
         # Build status response
         status = HardwareStatus(
-            servo={
-                "position": servo_status.get("position", "unknown"),
-                "operational": servo_status.get("operational", False),
-                "controller_reachable": True,
-                "current_compartment": servo_status.get("current_compartment"),
-                "last_response": datetime.utcnow().isoformat()
-            },
+            servo=servo_status or {},
             leds=led_status,
             last_updated=datetime.utcnow()
         )
@@ -170,78 +204,61 @@ async def get_hardware_status(request: Request):
         
         # Return error status
         return HardwareStatus(
-            servo={
-                "position": "unknown",
-                "operational": False,
-                "controller_reachable": False,
-                "last_response": None
-            },
+            servo={},
             leds={},
             last_updated=datetime.utcnow()
         )
 
 
-@router.post("/test")
-async def test_hardware(request: Request, component: str, action: str):
-    """
-    Test individual hardware components
-    
-    Args:
-        component: "servo" or "led"
-        action: Component-specific action
-            - servo: "open", "close", "status"
-            - led: "on:<id>", "off:<id>", "blink:<id>", "clear", "status"
-    
-    Returns:
-        Test results with component response
-    """
+@router.post("/test/led/{compartment}")
+async def test_led(compartment: int, request: Request):
+    """Test LED for specific compartment"""
     hardware = request.app.state.hardware
     
     try:
-        result = {}
+        if compartment < 1 or compartment > 4:
+            raise HTTPException(status_code=400, detail="Compartment must be 1-4")
         
-        if component == "servo":
-            if action == "open":
-                result = await hardware.open_servo(1)
-            elif action == "close":
-                result = await hardware.close_servo()
-            elif action == "status":
-                result = await hardware.get_servo_status()
-            else:
-                raise HTTPException(status_code=400, detail=f"Invalid servo action: {action}")
-                
-        elif component == "led":
-            if action.startswith("on:"):
-                led_id = int(action.split(":")[1])
-                result = await hardware.turn_on_led(led_id)
-            elif action.startswith("off:"):
-                led_id = int(action.split(":")[1])
-                result = await hardware.turn_off_led(led_id)
-            elif action.startswith("blink:"):
-                led_id = int(action.split(":")[1])
-                result = await hardware.blink_led(led_id)
-            elif action == "clear":
-                result = await hardware.clear_all_leds()
-            elif action == "status":
-                result = await hardware.get_led_status()
-            else:
-                raise HTTPException(status_code=400, detail=f"Invalid LED action: {action}")
-        else:
-            raise HTTPException(status_code=400, detail=f"Invalid component: {component}")
+        # Blink LED
+        await hardware.blink_led(compartment, duration=2.0)
+        
+        return {"status": "success", "compartment": compartment}
+    except Exception as e:
+        logger.error(f"Error testing LED: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/test/servo")
+async def test_servo(request: Request):
+    """Test servo connection and movement"""
+    hardware = request.app.state.hardware
+    
+    try:
+        # Test connection
+        connected = await hardware.test_connection()
+        
+        if not connected:
+            raise Exception("Hardware controller not responding")
+        
+        # Test open
+        open_response = await hardware.open_servo(1)
+        
+        # Wait a moment
+        import asyncio
+        await asyncio.sleep(2)
+        
+        # Test close
+        close_response = await hardware.close_servo()
         
         return {
-            "test_result": "success",
-            "component": component,
-            "action": action,
-            "response": result,
-            "timestamp": datetime.utcnow().isoformat()
+            "status": "success",
+            "connection": "ok",
+            "open_test": open_response,
+            "close_test": close_response
         }
-        
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"Hardware test failed: {e}")
-        raise HTTPException(status_code=503, detail=str(e))
+        logger.error(f"Error testing servo: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/connection")
@@ -260,7 +277,7 @@ async def check_hardware_connection(request: Request):
         return {
             "connected": connected,
             "controller_url": hardware.base_url if hasattr(hardware, 'base_url') else "mock",
-            "hardware_mode": request.app.state.hardware.__class__.__name__,
+            "hardware_mode": hardware.__class__.__name__,
             "timestamp": datetime.utcnow().isoformat()
         }
     except Exception as e:

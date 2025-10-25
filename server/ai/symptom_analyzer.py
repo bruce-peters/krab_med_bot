@@ -1,22 +1,30 @@
-import spacy
 import json
 import logging
+from server.models.schemas import SymptomExtractionResult
+from server.ai.llm_client import llm_client
+from server.ai.prompts import get_symptom_extraction_prompt
 
 logger = logging.getLogger(__name__)
 
-# Define SymptomExtractionResult class or import it if defined elsewhere
-# Define llm_client and get_symptom_extraction_prompt or import them if defined elsewhere
+# Try to import spaCy, but don't fail if not available
+try:
+    import spacy
+    SPACY_AVAILABLE = True
+except ImportError:
+    SPACY_AVAILABLE = False
+    logger.warning("spaCy not available - using fallback entity extraction")
 
 class SymptomAnalyzer:
     def __init__(self):
-        # Load spaCy model for entity extraction
-        try:
-            self.nlp = spacy.load("en_core_web_sm")
-        except:
-            # Download if not available
-            import subprocess
-            subprocess.run(["python", "-m", "spacy", "download", "en_core_web_sm"])
-            self.nlp = spacy.load("en_core_web_sm")
+        # Load spaCy model for entity extraction if available
+        self.nlp = None
+        if SPACY_AVAILABLE:
+            try:
+                self.nlp = spacy.load("en_core_web_sm")
+                logger.info("Loaded spaCy model for entity extraction")
+            except Exception as e:
+                logger.warning(f"Could not load spaCy model: {e}. Using fallback.")
+                self.nlp = None
         
         # Define symptom keywords
         self.symptom_keywords = {
@@ -37,10 +45,15 @@ class SymptomAnalyzer:
         """
         Extract symptoms from conversation using NLP and LLM
         """
-        # Use NLP for entity extraction
-        doc = self.nlp(conversation_text)
-        entities = [ent.text for ent in doc.ents]
-
+        # Use NLP for entity extraction if available
+        entities = []
+        if self.nlp:
+            try:
+                doc = self.nlp(conversation_text)
+                entities = [ent.text for ent in doc.ents]
+            except Exception as e:
+                logger.warning(f"spaCy entity extraction failed: {e}")
+        
         # Extract keywords
         detected_symptoms = self._extract_keywords(conversation_text.lower())
 

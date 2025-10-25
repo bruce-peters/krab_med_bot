@@ -1,5 +1,10 @@
+import base64
+import io
 from pathlib import Path
 import logging
+from openai import AsyncOpenAI
+import aiofiles
+from server.config import settings
 
 logger = logging.getLogger(__name__)
 

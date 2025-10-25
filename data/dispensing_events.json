@@ -1,0 +1,15 @@
+[
+  {
+    "event_id": "5154666d-4dc5-48c5-9012-637ef0db48a8",
+    "timestamp": "2025-10-25 19:36:44.348866",
+    "compartment": 1,
+    "medication_id": "550e8400-e29b-41d4-a716-446655440000",
+    "status": "failed",
+    "box_opened": false,
+    "led_activated": true,
+    "servo_response": null,
+    "error_message": "'MockHardwareInterface' object has no attribute 'highlight_compartment'",
+    "conversation_session_id": null,
+    "ai_greeting": null
+  }
+]
