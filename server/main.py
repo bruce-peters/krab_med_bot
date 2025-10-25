@@ -11,6 +11,8 @@ import logging
 from server.config import settings
 from server.controllers.hardware_interface import hardware_interface
 from server.controllers.mock_hardware import mock_hardware_interface
+from server.routes import hardware, medication
+from server.utils.json_handler import initialize_data_file
 
 # Setup logging
 logging.basicConfig(
@@ -26,6 +28,15 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("🚀 Starting Krab Med Bot API...")
     logger.info("📦 Initializing components...")
+    
+    # Initialize data files
+    logger.info("📁 Initializing data files...")
+    await initialize_data_file("data/medication_schedule.json", {
+        "user_id": "user_001",
+        "medications": []
+    })
+    await initialize_data_file("data/health_logs.json", [])
+    await initialize_data_file("data/user_interactions.json", [])
     
     # Initialize hardware interface based on mode
     if settings.hardware_mode == "mock":
@@ -82,6 +93,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Include routers
+app.include_router(hardware.router)
+app.include_router(medication.router)
+
 
 # Root endpoint
 @app.get("/")
@@ -116,36 +131,6 @@ async def health_check():
         "hardware_mode": settings.hardware_mode,
         "hardware_status": hardware_status
     }
-
-
-# Test endpoint for hardware
-@app.get("/api/test/hardware")
-async def test_hardware():
-    """Test hardware interface"""
-    try:
-        # Test servo
-        servo_status = await app.state.hardware.get_servo_status()
-        
-        # Test LEDs
-        led_status = await app.state.hardware.get_led_status()
-        
-        # Test connection
-        connection_ok = await app.state.hardware.test_connection()
-        
-        return {
-            "message": "Hardware test successful",
-            "connection": "ok" if connection_ok else "failed",
-            "servo": servo_status,
-            "leds": led_status,
-            "hardware_mode": settings.hardware_mode
-        }
-    except Exception as e:
-        logger.error(f"Hardware test failed: {e}")
-        return {
-            "message": "Hardware test failed",
-            "error": str(e),
-            "hardware_mode": settings.hardware_mode
-        }
 
 
 if __name__ == "__main__":
