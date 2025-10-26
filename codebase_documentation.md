@@ -278,6 +278,79 @@ model = settings.llm_model
 
 ---
 
+### Data Export (`/api/data`)
+
+#### `GET /api/data/export/patient-data`
+
+**Purpose**: Aggregate all project JSON data into reference patient data format.
+
+**Response**:
+
+```json
+{
+  "patient_info": {
+    "name": "Patient Name",
+    "age": 30,
+    "pills": [
+      {
+        "name": "Medication Name",
+        "frequency": {
+          "Monday": true,
+          "Tuesday": true,
+          ...
+        },
+        "box_index": 1
+      }
+    ]
+  },
+  "transcriptions": [
+    {
+      "timestamp": 1761340800,
+      "transcription": "Patient's health update or conversation text"
+    }
+  ]
+}
+```
+
+**Data Sources**:
+
+- `medication_schedule.json` → patient info and pills
+- `health_logs.json` → health transcriptions
+- `user_interactions.json` → conversation transcriptions
+
+#### `POST /api/data/export/patient-data/save`
+
+**Purpose**: Export and save aggregated patient data to a file.
+
+**Query Parameters**:
+
+- `filename` (optional): Output filename (default: "exported_patient_data.json")
+
+**Response**:
+
+```json
+{
+  "status": "success",
+  "message": "Patient data exported successfully",
+  "file_path": "/path/to/exported_patient_data.json",
+  "record_count": {
+    "pills": 6,
+    "transcriptions": 10
+  }
+}
+```
+
+#### `GET /api/data/export/patient-data/download`
+
+**Purpose**: Download the aggregated patient data as a JSON file attachment.
+
+**Response**:
+
+- Content-Disposition: attachment; filename="patient_data_export.json"
+- Body: same JSON structure as GET /api/data/export/patient-data
+
+---
+
 ## Setup & Usage
 
 ### Prerequisites

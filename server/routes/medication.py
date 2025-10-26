@@ -13,12 +13,17 @@ from server.models.schemas import (
     MedicationEntry,
     MedicationSchedule,
     MarkTakenRequest,
-    SuccessResponse
+    SuccessResponse,
+    Medication,
+    MedicationCreate,
+    MedicationUpdate
 )
 from server.utils.json_handler import (
     load_json_file,
     save_json_file,
-    update_json_entry
+    update_json_entry,
+    read_json,
+    write_json
 )
 
 logger = logging.getLogger(__name__)
@@ -27,6 +32,7 @@ router = APIRouter(prefix="/api/medications", tags=["medications"])
 
 # Data file path
 MEDICATION_FILE = "data/medication_schedule.json"
+SCHEDULE_FILE = "data/schedule.json"
 
 
 @router.get("/", response_model=List[MedicationEntry])
@@ -265,6 +271,66 @@ async def create_medication(medication: MedicationEntry):
         
     except Exception as e:
         logger.error(f"Failed to create medication: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/schedule", response_model=Medication)
+async def create_medication(medication: MedicationCreate):
+    """Create a new medication in the schedule"""
+    try:
+        schedule = read_json(SCHEDULE_FILE, default={"patient_name": "Unknown Patient", "patient_age": 0, "medications": []})
+        
+        new_med = Medication(
+            name=medication.name,
+            dosage=medication.dosage,
+            frequency=medication.frequency,
+            box_index=medication.box_index,
+            instructions=medication.instructions
+        )
+        
+        schedule["medications"].append(new_med.dict())
+        write_json(SCHEDULE_FILE, schedule)
+        
+        return new_med
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/schedule/{medication_id}", response_model=Medication)
+async def update_medication(medication_id: str, medication: MedicationUpdate):
+    """Update an existing medication"""
+    try:
+        schedule = read_json(SCHEDULE_FILE, default={"medications": []})
+        
+        med_index = None
+        for i, med in enumerate(schedule["medications"]):
+            if med["id"] == medication_id:
+                med_index = i
+                break
+        
+        if med_index is None:
+            raise HTTPException(status_code=404, detail="Medication not found")
+        
+        # Update fields
+        if medication.name is not None:
+            schedule["medications"][med_index]["name"] = medication.name
+        if medication.dosage is not None:
+            schedule["medications"][med_index]["dosage"] = medication.dosage
+        if medication.frequency is not None:
+            schedule["medications"][med_index]["frequency"] = medication.frequency.dict()
+        if medication.box_index is not None:
+            schedule["medications"][med_index]["box_index"] = medication.box_index
+        if medication.instructions is not None:
+            schedule["medications"][med_index]["instructions"] = medication.instructions
+        
+        schedule["medications"][med_index]["updated_at"] = datetime.utcnow().isoformat()
+        
+        write_json(SCHEDULE_FILE, schedule)
+        
+        return Medication(**schedule["medications"][med_index])
+    except HTTPException:
+        raise
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 

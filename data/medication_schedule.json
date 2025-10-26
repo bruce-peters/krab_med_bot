@@ -1,29 +1,23 @@
 {
   "user_id": "user_001",
+  "patient_name": "Unknown Patient",
+  "patient_age": 0,
   "medications": [
     {
-      "medication_id": "550e8400-e29b-41d4-a716-446655440000",
-      "name": "Blood Pressure Medication",
-      "compartment": 1,
-      "scheduled_time": "2024-01-15T08:00:00Z",
-      "taken": false,
-      "taken_timestamp": null
-    },
-    {
-      "medication_id": "550e8400-e29b-41d4-a716-446655440000",
-      "name": "Tylenol",
-      "compartment": 1,
-      "scheduled_time": "2024-01-15T08:00:00Z",
-      "taken": false,
-      "taken_timestamp": null
-    },
-    {
-      "medication_id": "550e8400-e29b-41d4-a716-446655440000",
-      "name": "Biagra",
-      "compartment": 1,
-      "scheduled_time": "2024-01-15T08:00:00Z",
-      "taken": false,
-      "taken_timestamp": null
+      "id": "med-001",
+      "name": "Example Medication",
+      "dosage": "10mg",
+      "frequency": {
+        "Monday": true,
+        "Tuesday": true,
+        "Wednesday": true,
+        "Thursday": true,
+        "Friday": true,
+        "Saturday": false,
+        "Sunday": false
+      },
+      "box_index": 1,
+      "instructions": "Take with food"
     }
   ]
 }

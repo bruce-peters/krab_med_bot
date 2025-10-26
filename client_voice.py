@@ -13,6 +13,7 @@ import io
 import time
 import logging
 from typing import Optional
+import httpx  # Replace requests with httpx
 
 # Configuration
 SERVER_URL = "http://localhost:5000/api/voice/interact"
@@ -49,37 +50,39 @@ def listen_for_speech() -> Optional[bytes]:
 def send_to_server(audio_data: bytes) -> Optional[dict]:
     """Send audio to server and get response"""
     global SESSION_ID
-    print("Session id", SESSION_ID)
+    logger.debug(f"Session ID before request: {SESSION_ID}")
     
     # Encode audio as Base64
     audio_base64 = base64.b64encode(audio_data).decode('utf-8')
     
-    # Prepare request payload
+    # Prepare form-data payload
     payload = {
-        "session_id": SESSION_ID,
+        "session_id": SESSION_ID or "",
         "audio_data": audio_base64,
     }
-    print(f"Sending payload: {payload}")
+    logger.debug(f"Payload being sent as form-data: {payload}")
     
     try:
-        # Send request
-        response = requests.post(SERVER_URL, json=payload, timeout=30)
+        # Send request using requests
+        response = requests.post(SERVER_URL, json=payload)  # Use `data` for form-data
+        logger.debug(f"Server response status: {response.status_code}")
+        logger.debug(f"Server response body: {response.text}")
         response.raise_for_status()
         
         # Parse response
         result = response.json()
-        logger.debug(f"Server response: {result}")
+        logger.debug(f"Parsed server response: {result}")
         
         # Update session ID only if it's present in the response
         new_session_id = result.get("session_id")
-        if new_session_id and SESSION_ID is None:
+        if new_session_id:
             logger.info(f"Updating session ID: {new_session_id}")
             SESSION_ID = new_session_id
         
         return result
         
-    except requests.exceptions.RequestException as e:
-        logger.error(f"❌ Server communication error: {e}")
+    except requests.RequestException as e:
+        logger.error(f"❌ HTTP request error: {e}")
         return None
 
 
@@ -142,7 +145,7 @@ def main():
             if audio_response:
                 play_audio(audio_response)
             
-            print(response)
+            # print(response)
             # Display symptoms if extracted
             symptoms = response.get("extracted_symptoms")
             if symptoms:

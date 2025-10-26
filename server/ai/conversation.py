@@ -383,4 +383,17 @@ class ConversationManager:
         
         return ". ".join(summary_parts) + "."
 
+def get_conversation_prompt(session_id: str, new_message: str) -> list:
+    """Build the LLM prompt with conversation history."""
+    conversation = conversation_manager.get_session(session_id)
+    if not conversation:
+        conversation = {"messages": []}
+
+    # Include conversation history
+    prompt = [{"role": "system", "content": "You are a helpful assistant."}]
+    prompt.extend(conversation["messages"])  # Add previous messages
+    prompt.append({"role": "user", "content": new_message})  # Add new message
+
+    return prompt
+
 conversation_manager = ConversationManager()

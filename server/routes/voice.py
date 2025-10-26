@@ -3,7 +3,7 @@ Voice Interaction Routes
 Handles voice-based conversations with speech-to-text and text-to-speech
 """
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Request
 from server.models.schemas import VoiceInteractionRequest, VoiceInteractionResponse
 from server.ai.conversation import conversation_manager
 from server.ai.speech import speech_service
@@ -16,12 +16,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/voice", tags=["voice"])
 
 @router.post("/interact", response_model=VoiceInteractionResponse)
-async def voice_interact(
-    session_id: Optional[str] = Form(None),
-    audio_data: Optional[str] = Form(None),
-    text_input: Optional[str] = Form(None),
-    medication_id: Optional[str] = Form(None)
-):
+async def voice_interact(request: Request):
     """
     Complete voice interaction cycle
     
@@ -46,6 +41,28 @@ async def voice_interact(
             "text_input": "I have a headache"
         }
     """
+    logger.info("Received request for /api/voice/interact")
+    
+    # Log raw request body
+    raw_body = await request.body()
+    logger.debug(f"Raw request body: {raw_body.decode('utf-8')}")
+    
+    # Parse request
+    try:
+        data = await request.json()
+        logger.debug(f"Parsed request data: {data}")
+    except Exception as e:
+        logger.error(f"Failed to parse request: {e}")
+        raise HTTPException(status_code=400, detail="Invalid request format")
+    
+    session_id = data.get("session_id")
+    audio_data = data.get("audio_data")
+    text_input = data.get("text_input")
+    medication_id = data.get("medication_id")
+    
+    logger.debug(f"Parsed session_id: {session_id}")
+    logger.info(f"Request data - session_id: {session_id}, medication_id: {medication_id}, text_input: {text_input}, audio_data: {'provided' if audio_data else 'not provided'}")
+    
     try:
         # Convert session_id and medication_id from string to UUID if provided
         session_uuid = UUID(session_id) if session_id else None
@@ -53,6 +70,7 @@ async def voice_interact(
         
         # Start or get existing session
         if session_uuid is None:
+            logger.info("No session_id provided. Starting a new session.")
             session = await conversation_manager.start_session(medication_uuid)
             session_uuid = session.session_id
             
@@ -61,9 +79,11 @@ async def voice_interact(
                 session_uuid,
                 "User has started voice interaction."
             )
+            logger.debug(f"Generated greeting: {greeting}")
             
             # Convert greeting to speech
             greeting_audio = await speech_service.text_to_speech(greeting)
+            logger.debug("Converted greeting to audio.")
             
             return VoiceInteractionResponse(
                 session_id=session_uuid,
@@ -90,6 +110,9 @@ async def voice_interact(
         
         # Get AI response
         ai_response = await conversation_manager.generate_response(session_uuid, user_text)
+
+        # Extract follow-up questions from the response
+        follow_up_questions = _generate_follow_ups(ai_response)
         
         # Convert response to speech
         response_audio = await speech_service.text_to_speech(ai_response)
@@ -117,7 +140,7 @@ async def voice_interact(
             ai_response_audio=response_audio,
             extracted_symptoms=current_symptoms,
             recommendations=None,  # Only provided at end of conversation
-            follow_up_questions=_generate_follow_ups(ai_response)
+            follow_up_questions=follow_up_questions
         )
         
     except KeyError:

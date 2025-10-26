@@ -149,6 +149,11 @@ class RecommendationEngine:
 
     def _assess_priority(self, text: str, symptoms: dict) -> str:
         """Assess recommendation priority"""
+        # Ensure `pain_level` is an integer
+        pain_level = symptoms.get("pain_level", 0) or 0  # Default to 0 if None
+        if pain_level >= 7:
+            return "high"
+        
         text_lower = text.lower()
         
         # High priority keywords
