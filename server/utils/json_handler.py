@@ -240,3 +240,26 @@ async def save_dispensing_event(event: DispensingEvent) -> None:
     
     async with aiofiles.open(filepath, mode='w') as f:
         await f.write(json.dumps(data, indent=2, default=str))
+
+def read_json(file_path: Path, default: Optional[Any] = None) -> Any:
+    """
+    Read a JSON file and return its contents.
+    If the file does not exist, return the default value.
+    """
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return default
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Failed to decode JSON from {file_path}: {e}")
+
+def write_json(file_path: Path, data: Any) -> None:
+    """
+    Write data to a JSON file.
+    """
+    try:
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4)
+    except Exception as e:
+        raise IOError(f"Failed to write JSON to {file_path}: {e}")

@@ -7,9 +7,51 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from uuid import UUID, uuid4
+from enum import Enum
 
 
 # ========== MEDICATION MODELS ==========
+
+class MedicationFrequency(BaseModel):
+    """Day-based medication frequency"""
+    Monday: bool = False
+    Tuesday: bool = False
+    Wednesday: bool = False
+    Thursday: bool = False
+    Friday: bool = False
+    Saturday: bool = False
+    Sunday: bool = False
+
+
+class Medication(BaseModel):
+    """Medication information"""
+    id: str = Field(default_factory=lambda: str(uuid4()))
+    name: str
+    dosage: Optional[str] = None
+    frequency: MedicationFrequency
+    box_index: int = Field(..., ge=1, le=6, description="Compartment number (1-6)")
+    instructions: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class MedicationCreate(BaseModel):
+    """Request model for creating medication"""
+    name: str
+    dosage: Optional[str] = None
+    frequency: MedicationFrequency
+    box_index: int = Field(..., ge=1, le=6)
+    instructions: Optional[str] = None
+
+
+class MedicationUpdate(BaseModel):
+    """Request model for updating medication"""
+    name: Optional[str] = None
+    dosage: Optional[str] = None
+    frequency: Optional[MedicationFrequency] = None
+    box_index: Optional[int] = Field(None, ge=1, le=6)
+    instructions: Optional[str] = None
+
 
 class MedicationEntry(BaseModel):
     """Medication entry in the schedule"""
@@ -58,16 +100,13 @@ class MedicationSchedule(BaseModel):
 # ========== HEALTH DATA MODELS ==========
 
 class HealthSymptoms(BaseModel):
-    """Symptoms reported by user"""
-    pain_level: Optional[int] = Field(None, ge=0, le=10, description="Pain level 0-10")
-    nausea: bool = False
-    dizziness: bool = False
-    fatigue: bool = False
-    headache: bool = False
-    shortness_of_breath: bool = False
-    custom_notes: Optional[str] = Field(None, max_length=1000)
-    other_symptoms: List[str] = Field(default_factory=list)
-    
+    """Schema for health symptoms."""
+    nausea: bool = Field(default=False)
+    dizziness: bool = Field(default=False)
+    fatigue: bool = Field(default=False)
+    headache: bool = Field(default=False)
+    pain_level: int = Field(default=0, ge=0, le=10)  # Ensure pain_level is between 0 and 10
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {

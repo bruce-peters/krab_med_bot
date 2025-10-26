@@ -12,7 +12,7 @@ import logging
 from server.config import settings
 from server.controllers.hardware_interface import hardware_interface
 from server.controllers.mock_hardware import mock_hardware_interface
-from server.routes import hardware, medication, health_data, ai_conversation, voice
+from server.routes import hardware, medication, health_data, ai_conversation, voice, data_export
 from server.utils.json_handler import initialize_data_file
 
 # Setup logging
@@ -98,8 +98,9 @@ app.add_middleware(
 app.include_router(hardware.router)
 app.include_router(medication.router)
 app.include_router(health_data.router)
-app.include_router(ai_conversation.router)  # NEW
-app.include_router(voice.router)            # NEW
+app.include_router(ai_conversation.router)
+app.include_router(voice.router)
+app.include_router(data_export.router)
 
 
 # Root endpoint
