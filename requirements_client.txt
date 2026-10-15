@@ -1,5 +1,6 @@
 # Voice interaction client dependencies
-speech-recognition==3.10.0
-PyAudio==0.2.13
+SpeechRecognition==3.12.0
+PyAudio==0.2.14
 pygame==2.5.2
 requests==2.31.0
+httpx==0.26.0

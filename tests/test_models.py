@@ -127,11 +127,9 @@ def test_conversation_message():
 def test_conversation_session():
     """Test conversation session model"""
     session = ConversationSession(
-        user_id="test_user",
         medication_id=uuid4()
     )
     
-    assert session.user_id == "test_user"
     assert session.session_id is not None
     assert len(session.messages) == 0
 

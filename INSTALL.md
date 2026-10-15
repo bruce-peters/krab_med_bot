@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Python 3.8 or higher
+- Python 3.12 (tested). Python 3.13+ does not work with the pinned packages (no prebuilt wheels for pydantic-core 2.14 / tiktoken 0.5)
 - pip (Python package manager)
 - Git (optional, for version control)
 - 2-4 GB free disk space (for ML models)
@@ -12,7 +12,8 @@
 ### 1. Navigate to Project Directory
 
 ```bash
-cd /c:/Users/bruce/Projects/krab_med_bot
+git clone https://github.com/bruce-peters/krab_med_bot.git
+cd krab_med_bot
 ```
 
 ### 2. Create Virtual Environment
@@ -76,7 +77,9 @@ This will install:
 
 **Note:** This may take 5-15 minutes depending on your internet connection.
 
-### 6. Download spaCy Language Model
+### 6. Download spaCy Language Model (optional)
+
+Only needed if you uncomment `spacy` in `requirements.txt`. Without it the server uses a fallback symptom extractor.
 
 ```bash
 python -m spacy download en_core_web_sm
@@ -103,7 +106,8 @@ mkdir -p logs
 ### 8. Verify Installation
 
 ```bash
-python -c "import fastapi; import openai; import spacy; print('✓ All core packages installed successfully!')"
+python -c "import fastapi; import openai; print('✓ All core packages installed successfully!')"
+python check_install.py
 ```
 
 If you see the success message, you're good to go!
@@ -112,7 +116,13 @@ If you see the success message, you're good to go!
 
 ### 1. Set Up Environment Variables
 
-The `.env` file is already created. Update these important values:
+Create `.env` from the template (this replaces the `.env` that is in the repo):
+
+```bash
+cp .env.example .env
+```
+
+Then update these important values:
 
 ```bash
 # Open .env in a text editor

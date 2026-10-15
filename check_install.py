@@ -16,12 +16,13 @@ REQUIRED_PACKAGES = {
     'aiofiles': 'Async file operations',
     'openai': 'OpenAI API client',
     'anthropic': 'Anthropic API client',
+}
+
+# spacy, transformers and torch are commented out in requirements.txt (optional)
+OPTIONAL_PACKAGES = {
     'spacy': 'NLP library',
     'transformers': 'ML transformers',
     'torch': 'PyTorch',
-}
-
-OPTIONAL_PACKAGES = {
     'pytest': 'Testing framework',
     'black': 'Code formatter',
     'flake8': 'Code linter',
@@ -33,7 +34,8 @@ def check_package(package_name):
         if package_name == 'dotenv':
             # python-dotenv imports as dotenv
             import dotenv
-            return dotenv.__version__
+            from importlib.metadata import version
+            return getattr(dotenv, '__version__', None) or version('python-dotenv')
         elif package_name == 'pydantic_settings':
             # pydantic-settings imports as pydantic_settings
             from pydantic_settings import __version__
