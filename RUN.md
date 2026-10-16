@@ -38,10 +38,10 @@ uvicorn server.main:app --reload --host 0.0.0.0 --port 5000
 python -m uvicorn server.main:app --reload --host 0.0.0.0 --port 5000
 ```
 
-**Method 3: Running the main.py directly**
+**Method 3: Running main.py as a module** (uses HOST/PORT from `.env`)
 
 ```bash
-python server/main.py
+python -m server.main
 ```
 
 ### 3. Access the Application
@@ -62,7 +62,7 @@ INFO:     Application startup complete.
 - **Alternative Documentation (ReDoc):** http://localhost:5000/redoc
 - **Root Endpoint:** http://localhost:5000/
 - **Health Check:** http://localhost:5000/health
-- **Test Endpoint:** http://localhost:5000/api/test
+- **Hardware status:** http://localhost:5000/api/hardware/status
 
 ## Command Options Explained
 
@@ -117,10 +117,10 @@ curl http://localhost:5000/
 curl http://localhost:5000/health
 ```
 
-**Test API endpoint:**
+**Test an API endpoint:**
 
 ```bash
-curl http://localhost:5000/api/test
+curl http://localhost:5000/api/hardware/status
 ```
 
 ### Using Browser
@@ -151,7 +151,7 @@ kill -9 <PID>
 **Solution:** Make sure you're in the project root directory
 
 ```bash
-cd /c:/Users/bruce/Projects/krab_med_bot
+cd krab_med_bot
 python -m uvicorn server.main:app --reload
 ```
 
